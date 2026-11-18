@@ -120,6 +120,7 @@ pub fn run() {
             commands::library_set_hidden,
             commands::library_art_search,
             commands::library_details,
+            commands::library_description,
             commands::library_set_art,
             commands::library_captures,
             commands::library_programs,

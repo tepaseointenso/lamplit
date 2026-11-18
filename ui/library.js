@@ -2,7 +2,7 @@
 // The home screen: the cover row, the hero art, logo and details of the focused game, and its menu, which lifts its
 // cover (lift.js).
 
-import { assetUrl, dockCloseGame, dockState, libraryDetails, libraryRemoveGame, librarySetFavourite, librarySetHidden, librarySetPlatform } from './api.js';
+import { assetUrl, dockCloseGame, dockState, libraryDescription, libraryRemoveGame, librarySetFavourite, librarySetHidden, librarySetPlatform } from './api.js';
 import { readCaptures } from './captures.js';
 import { finishHint, showHints, toast } from './hints.js';
 import { hold, holdRing, letGo } from './hold.js';
@@ -212,8 +212,7 @@ function showBlurb(g) {
   els.blurb.textContent = '';
   if (state.prefs?.online_art === false) return;
   blurbTimer = setTimeout(async () => {
-    const details = await libraryDetails(g.id).catch(() => null);
-    const text = details?.description ?? '';
+    const text = (await libraryDescription(g.id).catch(() => null)) ?? '';
     blurbs.set(g.id, text);
     if (blurbFor !== g.id) return;
     els.blurb.textContent = text;

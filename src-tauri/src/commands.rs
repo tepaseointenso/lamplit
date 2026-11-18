@@ -74,6 +74,12 @@ pub async fn library_details(app: AppHandle, id: String) -> Result<Option<Detail
     blocking(move || library::game_details(&app, &id)).await?
 }
 
+/// The game's description for the home screen, without About's images; None while Find art online is off.
+#[tauri::command]
+pub async fn library_description(app: AppHandle, id: String) -> Result<Option<String>> {
+    blocking(move || library::game_description(&app, &id)).await?
+}
+
 /// The art the player chose for a game; None for Lamplit's own match. Returns every game, with the change.
 #[tauri::command]
 pub async fn library_set_art(app: AppHandle, id: String, choice: Option<ArtChoice>) -> Result<Vec<Game>> {

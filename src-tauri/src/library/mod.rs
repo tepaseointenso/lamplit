@@ -16,7 +16,7 @@ pub(crate) mod sgdb;
 mod user_data;
 
 pub use art::{Candidate, Source as ArtSource, candidates as art_candidates};
-pub use details::{Details, get as game_details};
+pub use details::{Details, description as game_description, get as game_details};
 pub use game::{Art, ArtChoice, Game, Launch};
 pub use igdb::State as IgdbState;
 pub use manual::{Folder, Program, browse};

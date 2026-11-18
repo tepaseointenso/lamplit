@@ -64,6 +64,17 @@ struct Cache {
 static FETCHING: Mutex<BTreeMap<u32, Arc<Mutex<()>>>> = Mutex::new(BTreeMap::new());
 
 pub fn get(app: &AppHandle, id: &str) -> Result<Option<Details>> {
+    get_with(app, id, true)
+}
+
+/// The game's description alone, for the home screen: the same lookup and caches as About, without downloading
+/// screenshots or a trailer's poster, so resting on a game costs one small request at most.
+pub fn description(app: &AppHandle, id: &str) -> Result<Option<String>> {
+    Ok(get_with(app, id, false)?.map(|d| d.description).filter(|d| !d.is_empty()))
+}
+
+/// About's details; with `images`, the screenshots and the trailer's poster downloaded as asset URLs.
+fn get_with(app: &AppHandle, id: &str, images: bool) -> Result<Option<Details>> {
     if !prefs::get(app).online_art {
         return Ok(None);
     }
@@ -82,7 +93,7 @@ pub fn get(app: &AppHandle, id: &str) -> Result<Option<Details>> {
         Some(appid) => {
             let fetching = FETCHING.lock().entry(appid).or_default().clone();
             let _fetch = fetching.lock();
-            fetch(app, appid, &mut store)
+            fetch(app, appid, &mut store, images)
         }
         None => Ok(None),
     };
@@ -92,7 +103,7 @@ pub fn get(app: &AppHandle, id: &str) -> Result<Option<Details>> {
         None => (game.id.clone(), game.name.clone()),
     };
     let result = match steam {
-        Ok(None) => from_igdb(app, &key, &name, &mut store),
+        Ok(None) => from_igdb(app, &key, &name, &mut store, images),
         other => other,
     };
     // A setting changed during an HTTP request takes effect before anything reaches the page.
@@ -116,7 +127,7 @@ pub fn forget_igdb_misses() {
 
 /// IGDB's details of the game called `name` (`key`: whose they are, for the caches), cached like Steam's, with the
 /// screenshots downloaded.
-fn from_igdb(app: &AppHandle, key: &str, name: &str, store: &mut SteamStore) -> Result<Option<Details>> {
+fn from_igdb(app: &AppHandle, key: &str, name: &str, store: &mut SteamStore, images: bool) -> Result<Option<Details>> {
     let now = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs());
     let file = {
         let mut hash = DefaultHasher::new();
@@ -136,11 +147,14 @@ fn from_igdb(app: &AppHandle, key: &str, name: &str, store: &mut SteamStore) -> 
         details
     };
     let Some(details) = details else { return Ok(None) };
+    if !images {
+        return Ok(Some(details));
+    }
     let dir = data::data_dir().join("art").join("igdb").join("screens");
     localize(app, store, details, &dir).map(Some)
 }
 
-fn fetch(app: &AppHandle, appid: u32, store: &mut SteamStore) -> Result<Option<Details>> {
+fn fetch(app: &AppHandle, appid: u32, store: &mut SteamStore, images: bool) -> Result<Option<Details>> {
     let now = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs());
     let language = lang::steam(&prefs::get(app).details_language, &crate::win::region::locale());
     // English kept its old name, so the details cached before languages are still used.
@@ -166,6 +180,9 @@ fn fetch(app: &AppHandle, appid: u32, store: &mut SteamStore) -> Result<Option<D
         details
     };
     let Some(details) = details else { return Ok(None) };
+    if !images {
+        return Ok(Some(details));
+    }
     let dir = data::data_dir().join("art").join(appid.to_string()).join("screens");
     localize(app, store, details, &dir).map(Some)
 }

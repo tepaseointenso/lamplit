@@ -323,6 +323,8 @@ export const libraryArtSearch = (query, source) => call('library_art_search', { 
 export const libraryCaptures = (id) => call('library_captures', { id });
 /** @param {string} id @returns {Promise<GameDetails | null>} */
 export const libraryDetails = (id) => call('library_details', { id });
+/** The description alone, for the home screen. @param {string} id @returns {Promise<string | null>} */
+export const libraryDescription = (id) => call('library_description', { id });
 /**
  * The art the player chose, null for Lamplit's own match.
  * @param {string} id @param {ArtChoice | null} choice @returns {Promise<Game[]>} every game, with the change
