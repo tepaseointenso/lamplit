@@ -112,6 +112,8 @@ body.still .hero, body.morphing .hero, #stage[data-stage] .hero { animation-play
   transition: opacity 300ms ease;
 }
 
+/* Every logo gets about the same area whatever its shape (library.js sizeLogo sets width and height, and crops its
+   transparent margins with object-view-box), within these bounds. */
 #logo {
   display: none;
   max-width: 34vw;
@@ -167,6 +169,21 @@ body.still .hero, body.morphing .hero, #stage[data-stage] .hero { animation-play
 #played:not(:empty) + #playtime:not(:empty)::before { content: '·'; margin-right: 1.4vh; }
 
 /* The focused game's description (Steam's in the chosen language, or IGDB's), under its logo and pills. */
+#blurb {
+  margin-top: 2vh;
+  max-width: 40vw;
+  font-size: 2.1vh;
+  line-height: 1.45;
+  color: var(--ink-dim);
+  text-shadow: 0 .2vh 1vh rgb(0 0 0 / .7);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
+  transition: opacity 260ms ease;
+}
+#blurb:empty, #blurb.off { opacity: 0; }
+
 .pill.quiet { background: rgb(255 255 255 / .1); border-color: rgb(255 255 255 / .25); }
 .pill.warn { background: rgb(255 190 80 / .2); border-color: rgb(255 190 80 / .6); color: #ffd58a; }
 .pill:empty { display: none; }

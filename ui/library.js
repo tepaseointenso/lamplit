@@ -125,19 +125,131 @@ function setLogo(g) {
   els.logo.classList.remove('on');
   if (!url) return showTitle();
   els.logo.onload = () => {
-    if (key === logoKey) els.logo.classList.add('on');
     if (key !== logoKey) return;
+    sizeLogo(els.logo);
+    els.logo.classList.add('on');
   };
   els.logo.onerror = showTitle;
   els.logo.alt = g.name;
   els.logo.src = url;
 }
 
+/** How much of the screen a logo covers, in vh² (a 3.2:1 logo is then 13 vh tall), whatever its shape. */
+const LOGO_AREA = 13 * 13 * 3.2;
+
+/**
+ * Sizes a loaded logo so every game's covers about the same area: a wide one is lower, a tall one narrower, rather
+ * than each filling the box one way. Its transparent margins, which some logos have plenty of, are cropped first
+ * when the page may read its pixels.
+ * @param {HTMLImageElement} img
+ */
+function sizeLogo(img) {
+  const vh = innerHeight / 100;
+  const box = visibleBox(img) ?? { x: 0, y: 0, w: 1, h: 1 };
+  const ratio = (img.naturalWidth * box.w) / Math.max(1, img.naturalHeight * box.h);
+  let h = Math.sqrt(LOGO_AREA / ratio);
+  h = Math.min(18, Math.max(7, h));
+  let w = h * ratio;
+  const maxW = (innerWidth * 0.34) / vh;
+  if (w > maxW) [w, h] = [maxW, maxW / ratio];
+  img.style.width = `${w}vh`;
+  img.style.height = `${h}vh`;
+  const pct = (/** @type {number} */ n) => `${(n * 100).toFixed(2)}%`;
+  img.style.setProperty('object-view-box', `inset(${pct(box.y)} ${pct(1 - box.x - box.w)} ${pct(1 - box.y - box.h)} ${pct(box.x)})`);
+}
+
+/**
+ * The part of an image that isn't transparent, as fractions of its size, or null when its pixels can't be read.
+ * @param {HTMLImageElement} img @returns {{ x: number, y: number, w: number, h: number } | null}
+ */
+function visibleBox(img) {
+  try {
+    const scale = Math.min(1, 256 / Math.max(img.naturalWidth, img.naturalHeight));
+    const w = Math.max(1, Math.round(img.naturalWidth * scale));
+    const h = Math.max(1, Math.round(img.naturalHeight * scale));
+    const canvas = Object.assign(document.createElement('canvas'), { width: w, height: h });
+    const ctx = /** @type {CanvasRenderingContext2D} */ (canvas.getContext('2d', { willReadFrequently: true }));
+    ctx.drawImage(img, 0, 0, w, h);
+    const data = ctx.getImageData(0, 0, w, h).data;
+    let [x0, y0, x1, y1] = [w, h, -1, -1];
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        if (data[(y * w + x) * 4 + 3] > 16) {
+          if (x < x0) x0 = x;
+          if (x > x1) x1 = x;
+          if (y < y0) y0 = y;
+          if (y > y1) y1 = y;
+        }
+      }
+    }
+    if (x1 < 0) return null;
+    return { x: x0 / w, y: y0 / h, w: (x1 - x0 + 1) / w, h: (y1 - y0 + 1) / h };
+  } catch {
+    return null;
+  }
+}
+
+/** Descriptions read so far, by game, so moving back and forth along the row asks Rust once. */
+const blurbs = new Map();
+let blurbTimer = 0;
+let blurbFor = '';
+
+/**
+ * The focused game's description under its logo, once focus has rested on it a moment: asking for details downloads
+ * screenshots too, which a player scrolling past shouldn't wait on.
+ * @param {Shown} g
+ */
+function showBlurb(g) {
+  if (blurbFor === g.id) return;
+  blurbFor = g.id;
+  clearTimeout(blurbTimer);
+  els.blurb.classList.add('off');
+  if (blurbs.has(g.id)) {
+    els.blurb.textContent = blurbs.get(g.id);
+    els.blurb.classList.remove('off');
+    return;
+  }
+  els.blurb.textContent = '';
+  if (state.prefs?.online_art === false) return;
+  blurbTimer = setTimeout(async () => {
+    const details = await libraryDetails(g.id).catch(() => null);
+    const text = details?.description ?? '';
+    blurbs.set(g.id, text);
+    if (blurbFor !== g.id) return;
+    els.blurb.textContent = text;
+    els.blurb.classList.remove('off');
+  }, 600);
+}
+
 /** Forgets the descriptions read, as after the language changed in Settings. */
+export function forgetBlurbs() {
+  blurbs.clear();
+  blurbFor = '';
+}
+
 /** A platform stepped in the game's menu and not saved yet: it is saved as the menu closes. */
+let platformDraft = /** @type {{ id: string, platform: string | null } | null} */ (null);
+
 /** Lamplit's own reading of `g`'s platform, when the player hasn't chosen one. @param {Shown} g */
+const autoPlatform = (g) => (g.platform_choice ? null : g.platform);
+
 /** The platform the menu shows for `g`: one being chosen, else its own. @param {Shown} g */
+const draftPlatform = (g) => (platformDraft?.id === g.id ? platformDraft.platform : g.platform_choice);
+
 /** Saves a platform stepped in the menu, if it changed. */
+async function savePlatform() {
+  const draft = platformDraft;
+  platformDraft = null;
+  const g = draft && byId(draft.id);
+  if (!draft || !g || draft.platform === g.platform_choice) return;
+  try {
+    setGames(await librarySetPlatform(draft.id, draft.platform));
+    if (focused()?.id === draft.id) showInfo();
+  } catch (e) {
+    toast(e.message, { game: g, warn: true });
+  }
+}
+
 export function showInfo() {
   const g = focused();
   // A search that matches nothing, or a library of hidden games, leaves no game to show.
@@ -146,6 +258,8 @@ export function showInfo() {
   setLogo(g);
   // The pill shows the store's logo and key, which the stylesheet upper-cases: STEAM, EPIC, and PC outside any store.
   els.store.replaceChildren(...withStoreLogo(g.store, g.store ?? 'pc'));
+  els.platform.textContent = g.platform ?? '';
+  showBlurb(g);
   const warning = storeWarning(g, state.stores);
   els.note.textContent = state.running === g.id ? 'Playing' : warning ?? g.note ?? '';
   els.note.classList.toggle('warn', state.running !== g.id && !!warning);
@@ -191,6 +305,7 @@ export function openDetails() {
 export function closeDetails(away = false) {
   // A hold on one of its choices ends with it, also when a game's news closes it (launch.js).
   letGo();
+  savePlatform();
   state.mode = 'browse';
   closeFaces();
   lower(away);
@@ -257,7 +372,9 @@ async function readCloser(id) {
 function renderChoices() {
   letGo();
   const g = focused();
-  const list = choices();
+  const list = choices().map((c) =>
+    c.kind === 'platform' ? { ...c, label: `Platform: ${platformText({ ...g, platform_choice: draftPlatform(g), platform: draftPlatform(g) ?? autoPlatform(g) })}` } : c
+  );
   state.detailsIdx = Math.min(state.detailsIdx, list.length - 1);
   const rows = list.map((c, i) => {
     const row = document.createElement('div');
@@ -321,6 +438,9 @@ export function moveDetails(delta) {
 export function stepGamePlatform(dir) {
   const g = focused();
   if (!g) return;
+  platformDraft = { id: g.id, platform: stepPlatform(draftPlatform(g), dir) };
+  sfx.move();
+  renderChoices();
 }
 
 /** Cross held on a choice that can't be taken back: it happens once the ring round its icon is full. */

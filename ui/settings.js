@@ -8,8 +8,8 @@ import { morph, turn } from './morph.js';
 import * as api from './api.js';
 import { showHints, toast } from './hints.js';
 import { hold, letGo } from './hold.js';
-import { glyph, labelled, setGames, showInfo } from './library.js';
 import { SAVER_DEFAULT, SECTIONS, focusIndex, quietMode, rowKey, sectionRows, sectionSummary, stepAutoOff, stepDetailsLanguage, stepEdgeTarget, stepInterfaceSounds, stepSaverMinutes, stepTrailers, visibleSections } from './logic.js';
+import { forgetBlurbs, glyph, labelled, setGames, showInfo } from './library.js';
 import { showScreensaver, warmScreensaver } from './screensaver/index.js';
 import { setSoundLevel, sfx } from './sounds.js';
 import { SPRINGS } from './springs.js';
@@ -388,6 +388,7 @@ async function adjustDetailsLanguage(dir) {
   languageBusy = true;
   try {
     state.prefs = await api.prefsSetDetailsLanguage(next);
+    forgetBlurbs();
   } finally {
     languageBusy = false;
   }
@@ -527,11 +528,13 @@ export async function selectSetting() {
       state.startup = await api.startupSet(!state.startup?.enabled);
     } else if (row.kind === 'onlineart') {
       state.prefs = await api.prefsSetOnlineArt(!state.prefs?.online_art);
+      forgetBlurbs();
     } else if (row.kind === 'igdbid') {
       state.igdb = await api.igdbPasteClientId();
       toast('Client ID saved. Now copy the Client Secret and paste it on the next row.');
     } else if (row.kind === 'igdbsecret') {
       state.igdb = await api.igdbPasteSecret();
+      forgetBlurbs();
       toast('IGDB is ready. About shows details of games Steam doesn\'t have.');
     } else if (row.kind === 'igdbremove') {
       state.igdb = await api.igdbRemove();

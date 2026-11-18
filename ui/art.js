@@ -8,7 +8,7 @@ import * as api from './api.js';
 import { showHints, toast } from './hints.js';
 import { clickable, moveKey, nameField, pressKey, setText } from './keyboard.js';
 import { face, showSheet } from './lift.js';
-import { backToMenu, coverLook, setGames } from './library.js';
+import { backToMenu, coverLook, forgetBlurbs, setGames } from './library.js';
 import { nearest } from './logic.js';
 import { sfx } from './sounds.js';
 import { byId, els, state } from './state.js';
@@ -203,6 +203,8 @@ async function choose(choice) {
   render();
   try {
     setGames(await api.librarySetArt(art.id, choice));
+    // Art from another game can bring that game's description.
+    forgetBlurbs();
     if (!art.open) return;
     backToMenu();
   } catch (e) {

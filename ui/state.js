@@ -36,6 +36,8 @@ export const els = {
   logo: /** @type {HTMLImageElement} */ ($('logo')),
   title: $('title'),
   store: $('store'),
+  platform: $('platform'),
+  blurb: $('blurb'),
   note: $('note'),
   played: $('played'),
   playtime: $('playtime'),
