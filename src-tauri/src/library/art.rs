@@ -593,11 +593,12 @@ impl SteamStore {
         Ok(parse_search(&body))
     }
 
-    pub(super) fn details(&self, appid: u32) -> Result<serde_json::Value, ureq::Error> {
+    /// Steam's details of `appid`, in `language` (Steam's name for it, lang.rs).
+    pub(super) fn details(&self, appid: u32, language: &str) -> Result<serde_json::Value, ureq::Error> {
         self.agent
             .get("https://store.steampowered.com/api/appdetails")
             .query("appids", appid.to_string())
-            .query("l", "english")
+            .query("l", language)
             .call()?
             .body_mut()
             .read_json()

@@ -27,6 +27,9 @@ pub struct Entry {
     /// None: Lamplit's own match.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub art: Option<ArtChoice>,
+    /// The platform the player chose; None: Lamplit's own reading.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub platform: Option<String>,
     /// The game's name and exe, for a game the player added by hand.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub manual: Option<manual::Manual>,
@@ -99,6 +102,8 @@ pub fn apply(g: &mut Game, entry: &Entry) {
     g.hidden = entry.hidden;
     g.art_choice = entry.art;
     g.manual = entry.manual.is_some();
+    g.platform_choice.clone_from(&entry.platform);
+    g.platform = entry.platform.clone().or_else(|| super::platform::detect(g));
 }
 
 #[cfg(test)]

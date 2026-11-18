@@ -109,6 +109,7 @@ const fakeTauri = ({ games, running = null, launchError = null, earlyGames = nul
     startup_state: ${JSON.stringify(ipc('startup'))},
     steamgriddb_state: false,
     library_art_busy: false,
+    igdb_state: 'none',
     startup_set: ({ on }) => ({ enabled: on }),
     restore_changes: [],
   };

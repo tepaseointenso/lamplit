@@ -7,14 +7,18 @@ pub mod captures;
 mod details;
 mod discover;
 mod game;
+mod igdb;
+mod lang;
 mod manual;
 mod name_match;
+mod platform;
 pub(crate) mod sgdb;
 mod user_data;
 
 pub use art::{Candidate, Source as ArtSource, candidates as art_candidates};
 pub use details::{Details, get as game_details};
 pub use game::{Art, ArtChoice, Game, Launch};
+pub use igdb::State as IgdbState;
 pub use manual::{Folder, Program, browse};
 pub use user_data::UserData;
 
@@ -334,8 +338,48 @@ pub fn set_online_art(app: &AppHandle, on: bool) -> Result<()> {
     Ok(())
 }
 
+/// Searches again, at once, for every game that has no details or art: IGDB and SteamGridDB forget the names that
+/// matched nothing before, About's details are looked up for each game whatever its platform, and a scan fetches the
+/// What Settings shows of the player's IGDB credentials.
+pub fn igdb_state() -> igdb::State {
+    igdb::state()
+}
+
+/// Takes the IGDB (Twitch) Client ID the player copied, from the clipboard.
+pub fn igdb_paste_client_id() -> Result<igdb::State> {
+    igdb::set_client_id(&clipboard()?)?;
+    Ok(igdb::state())
+}
+
+/// Takes the Client Secret the player copied, once Twitch accepts the pair.
+pub fn igdb_paste_secret(app: &AppHandle) -> Result<igdb::State> {
+    igdb::set_secret(&art::SteamStore::new(app), &clipboard()?)?;
+    Ok(igdb::state())
+}
+
+pub fn igdb_remove() -> Result<igdb::State> {
+    igdb::remove()?;
+    Ok(igdb::state())
+}
+
 fn clipboard() -> Result<String> {
     crate::win::clipboard::text().ok_or_else(|| Error::Player("The clipboard has no text. Copy it first.".into()))
+}
+
+/// The languages About's descriptions can come in, for Settings: code and Steam's name.
+pub fn details_language_known(code: &str) -> bool {
+    lang::known(code)
+}
+
+/// Gives a game the platform the player chose, or back to Lamplit's own reading with None. Returns every game.
+pub fn set_platform(app: &AppHandle, id: &str, platform: Option<String>) -> Result<Vec<Game>> {
+    let platform = platform.map(|p| p.trim().to_string()).filter(|p| !p.is_empty());
+    if platform.as_ref().is_some_and(|p| p.chars().count() > 40) {
+        return Err(Error::Player("That platform name is too long.".into()));
+    }
+    change(app, id, |e| e.platform.clone_from(&platform))?;
+    log::info!("{id}: platform {}", platform.as_deref().unwrap_or("found by Lamplit"));
+    Ok(all(app))
 }
 
 /// Whether a pass is looking for art now.

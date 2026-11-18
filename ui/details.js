@@ -34,7 +34,11 @@ export async function openAbout() {
     els.aboutStatus.textContent = data ? '' : 'Lamplit has no details for this game.';
     if (data) {
       els.aboutDescription.textContent = data.description;
-      els.aboutMeta.textContent = [data.developers.join(', '), data.publishers.join(', '), data.released].filter(Boolean).join(' · ');
+      // The platform the player plays it as, else the ones IGDB lists.
+      const g = byId(id);
+      const platform = g?.platform ?? data.platforms.join(', ');
+      els.aboutMeta.textContent = [platform, data.developers.join(', '), data.publishers.join(', '), data.released, data.source === 'igdb' ? 'From IGDB' : '']
+        .filter(Boolean).join(' · ');
       els.aboutGenres.replaceChildren(...data.genres.map((genre) => Object.assign(document.createElement('span'), { textContent: genre })));
       els.aboutScreens.replaceChildren(...data.screenshots.map((shot, idx) => {
         const button = document.createElement('button');

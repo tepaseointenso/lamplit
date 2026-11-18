@@ -225,6 +225,11 @@ export const state = {
   startup: null,
   /** A pass is looking for covers, backgrounds and logos, long enough to say so (status.js). */
   artBusy: false,
+  /** @type {import('./api.js').IgdbState | null} the IGDB credentials Settings has; null until asked */
+  igdb: null,
+  /** Whether a SteamGridDB key is set; null until Settings has asked. */
+  /** @type {boolean | null} */
+  steamgriddb: null,
   restore: {
     running: false,
     /** @type {import('./api.js').RestoreStep[]} */

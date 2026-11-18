@@ -1,8 +1,9 @@
-// Steam's About data, cached for seven days. The cache keeps Steam URLs; only the IPC answer replaces images with
-// asset URLs after downloading them under art, whose scope already lets the page read them.
+// About's data: Steam's, in the language Settings picks (lang.rs), or IGDB's (igdb.rs, English) for a game Steam's
+// store doesn't have. Cached for seven days, per language. The cache keeps the sources' URLs; only the IPC answer
+// replaces images with asset URLs after downloading them under art, whose scope already lets the page read them.
 
-use super::Library;
 use super::art::{SteamStore, details_appid, unreached};
+use super::{Library, igdb, lang};
 use crate::data;
 use crate::error::{Error, Result};
 use crate::files::{nonempty, write_atomic};
@@ -35,12 +36,19 @@ pub struct Trailer {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Details {
+    /// The Steam app, 0 for details from IGDB.
     pub appid: u32,
+    /// Where they come from: "steam" or "igdb". Details cached before IGDB have none, and are Steam's.
+    #[serde(default)]
+    pub source: String,
     pub description: String,
     pub developers: Vec<String>,
     pub publishers: Vec<String>,
     pub released: String,
     pub genres: Vec<String>,
+    /// The platforms IGDB lists; empty from Steam.
+    #[serde(default)]
+    pub platforms: Vec<String>,
     pub screenshots: Vec<Screenshot>,
     pub trailer: Option<Trailer>,
 }
@@ -60,18 +68,60 @@ pub fn get(app: &AppHandle, id: &str) -> Result<Option<Details>> {
         return Ok(None);
     }
     let Some(game) = app.state::<Library>().game(id) else { return Ok(None) };
-    let Some(appid) = details_appid(&game) else { return Ok(None) };
-    let fetching = FETCHING.lock().entry(appid).or_default().clone();
-    let _fetch = fetching.lock();
     let mut store = SteamStore::new(app);
-    let result = fetch(app, appid, &mut store);
+    let steam = match details_appid(&game) {
+        Some(appid) => {
+            let fetching = FETCHING.lock().entry(appid).or_default().clone();
+            let _fetch = fetching.lock();
+            fetch(app, appid, &mut store)
+        }
+        None => Ok(None),
+    };
+    // A game Steam's store doesn't have, or has no details for: IGDB, when the player gave it credentials.
+    let (key, name) = (game.id.clone(), game.name.clone());
+    let result = match steam {
+        Ok(None) => from_igdb(app, &key, &name, &mut store),
+        other => other,
+    };
     // A setting changed during an HTTP request takes effect before anything reaches the page.
     if prefs::get(app).online_art { result } else { Ok(None) }
 }
 
+/// IGDB's details of the game called `name` (`key`: whose they are, for the caches), cached like Steam's, with the
+/// screenshots downloaded.
+fn from_igdb(app: &AppHandle, key: &str, name: &str, store: &mut SteamStore) -> Result<Option<Details>> {
+    let now = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs());
+    let file = {
+        let mut hash = DefaultHasher::new();
+        key.hash(&mut hash);
+        format!("details/igdb-{:016x}.json", hash.finish())
+    };
+    let cached: Option<Cache> = data::load(&file)?;
+    let details = if let Some(cache) = cached.filter(|c| fresh(c.fetched, now)) {
+        cache.details
+    } else {
+        if !store.online() || igdb::state() != igdb::State::Ready {
+            return Ok(None);
+        }
+        let details = igdb::details(store, key, name)?.map(|(_, d)| d);
+        std::fs::create_dir_all(data::data_dir().join("details"))?;
+        data::save(&file, &Cache { fetched: now, details: details.clone() })?;
+        details
+    };
+    let Some(details) = details else { return Ok(None) };
+    let dir = data::data_dir().join("art").join("igdb").join("screens");
+    localize(app, store, details, &dir).map(Some)
+}
+
 fn fetch(app: &AppHandle, appid: u32, store: &mut SteamStore) -> Result<Option<Details>> {
     let now = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs());
-    let name = format!("details/{appid}.json");
+    let language = lang::steam(&prefs::get(app).details_language, &crate::win::region::locale());
+    // English kept its old name, so the details cached before languages are still used.
+    let name = if language == "english" {
+        format!("details/{appid}.json")
+    } else {
+        format!("details/{appid}-{language}.json")
+    };
     let cached: Option<Cache> = data::load(&name)?;
     let details = if let Some(cache) = cached.filter(|c| fresh(c.fetched, now)) {
         cache.details
@@ -79,7 +129,7 @@ fn fetch(app: &AppHandle, appid: u32, store: &mut SteamStore) -> Result<Option<D
         if !store.online() {
             return Ok(None);
         }
-        let body = store.details(appid).map_err(|e| unreached(store, "appdetails", &e))?;
+        let body = store.details(appid, language).map_err(|e| unreached(store, "appdetails", &e))?;
         if !store.online() {
             return Ok(None);
         }
@@ -88,10 +138,16 @@ fn fetch(app: &AppHandle, appid: u32, store: &mut SteamStore) -> Result<Option<D
         data::save(&name, &Cache { fetched: now, details: details.clone() })?;
         details
     };
-    let Some(mut details) = details else { return Ok(None) };
-    let window = app.get_webview_window("main").ok_or(tauri::Error::WindowNotFound)?;
+    let Some(details) = details else { return Ok(None) };
     let dir = data::data_dir().join("art").join(appid.to_string()).join("screens");
-    std::fs::create_dir_all(&dir)?;
+    localize(app, store, details, &dir).map(Some)
+}
+
+/// `details` with its screenshots and trailer poster downloaded to `dir`, as asset URLs the page can load.
+fn localize(app: &AppHandle, store: &mut SteamStore, mut details: Details, dir: &Path) -> Result<Details> {
+    let window = app.get_webview_window("main").ok_or(tauri::Error::WindowNotFound)?;
+    std::fs::create_dir_all(dir)?;
+    let dir = dir.to_path_buf();
     let mut screenshots = Vec::new();
     for screenshot in details.screenshots {
         let thumb = image(store, &window, &dir, &screenshot.thumb)?;
@@ -104,7 +160,7 @@ fn fetch(app: &AppHandle, appid: u32, store: &mut SteamStore) -> Result<Option<D
     if let Some(trailer) = details.trailer.take() {
         details.trailer = image(store, &window, &dir, &trailer.poster)?.map(|poster| Trailer { poster, ..trailer });
     }
-    Ok(Some(details))
+    Ok(details)
 }
 
 fn fresh(fetched: u64, now: u64) -> bool {
@@ -157,6 +213,7 @@ fn parse(appid: u32, body: &Value) -> Result<Option<Details>> {
         .collect();
     Ok(Some(Details {
         appid,
+        source: "steam".into(),
         description: plain_text(data["short_description"].as_str().unwrap_or_default()),
         developers: strings("developers"),
         publishers: strings("publishers"),
@@ -167,6 +224,7 @@ fn parse(appid: u32, body: &Value) -> Result<Option<Details>> {
             .flatten()
             .filter_map(|g| g["description"].as_str().map(plain_text))
             .collect(),
+        platforms: Vec::new(),
         screenshots,
         trailer: trailer(&data["movies"]),
     }))
@@ -344,11 +402,13 @@ mod tests {
         let asset = "http://asset.localhost/C%3A%5Clamplit%5Cart%5C1245620%5Cscreens%5C";
         let details = Details {
             appid: 1_245_620,
+            source: "steam".into(),
             description: "Rise, Tarnished, and be guided by grace to brandish the power of the Elden Ring.".into(),
             developers: vec!["FromSoftware, Inc.".into()],
             publishers: vec!["Bandai Namco Entertainment Inc.".into()],
             released: "24 Feb, 2022".into(),
             genres: vec!["Action".into(), "RPG".into()],
+            platforms: Vec::new(),
             screenshots: vec![Screenshot { thumb: format!("{asset}thumb.jpg"), full: format!("{asset}full.jpg") }],
             trailer: Some(Trailer {
                 url: "https://video.fastly.steamstatic.com/store_trailers/1245620/dash_h264.mpd".into(),

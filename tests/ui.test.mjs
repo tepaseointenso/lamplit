@@ -1287,7 +1287,7 @@ for (const vp of [{ width: 1920, height: 1080 }, { width: 3840, height: 2160 }])
   d = await details();
   let s = await state(page);
   check('the menu has one line under the name: store, last played and hours played', d.time === '12 h' && /^[^·]+ · (Played|Not played)[^·]+ · 12 h$/.test(d.line), JSON.stringify(d));
-  check('Details open on Play, with the other choices below', d.focus === 'Play' && JSON.stringify(d.choices) === '["Play","About this game","Favourite","Change art","Hide this game"]' && s.hint.includes('✕Play'), `${JSON.stringify(d)} ${s.hint}`);
+  check('Details open on Play, with the other choices below', d.focus === 'Play' && JSON.stringify(d.choices) === '["Play","About this game","Favourite","Change art","Platform: Automatic← → to change","Hide this game"]' && s.hint.includes('✕Play'), `${JSON.stringify(d)} ${s.hint}`);
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');

@@ -2,13 +2,13 @@
 // The home screen: the cover row, the hero art, logo and details of the focused game, and its menu, which lifts its
 // cover (lift.js).
 
-import { assetUrl, dockCloseGame, dockState, libraryRemoveGame, librarySetFavourite, librarySetHidden } from './api.js';
+import { assetUrl, dockCloseGame, dockState, libraryDetails, libraryRemoveGame, librarySetFavourite, librarySetHidden, librarySetPlatform } from './api.js';
 import { readCaptures } from './captures.js';
 import { finishHint, showHints, toast } from './hints.js';
 import { hold, holdRing, letGo } from './hold.js';
 import { backToGame } from './launch.js';
 import { face, lift, lower, settle, showSheet } from './lift.js';
-import { accentOf, detailChoices, folderParts, lightOf, metaParts, narrowed, playTimeText, playedText, rowOf, storeWarning, words } from './logic.js';
+import { accentOf, detailChoices, folderParts, platformText, stepPlatform, lightOf, metaParts, narrowed, playTimeText, playedText, rowOf, storeWarning, words } from './logic.js';
 import { reduced } from './morph.js';
 import { stageChanged } from './veil.js';
 import { sfx } from './sounds.js';
@@ -133,6 +133,11 @@ function setLogo(g) {
   els.logo.src = url;
 }
 
+/** Forgets the descriptions read, as after the language changed in Settings. */
+/** A platform stepped in the game's menu and not saved yet: it is saved as the menu closes. */
+/** Lamplit's own reading of `g`'s platform, when the player hasn't chosen one. @param {Shown} g */
+/** The platform the menu shows for `g`: one being chosen, else its own. @param {Shown} g */
+/** Saves a platform stepped in the menu, if it changed. */
 export function showInfo() {
   const g = focused();
   // A search that matches nothing, or a library of hidden games, leaves no game to show.
@@ -306,6 +311,16 @@ export function moveDetails(delta) {
   sfx.move();
   renderChoices();
   showHints();
+}
+
+/**
+ * The focused game's platform, one step that way (Automatic, then the list): ← and → on the menu's Platform row, and
+ * ✕ for the next. It is saved as the menu closes.
+ * @param {number} dir
+ */
+export function stepGamePlatform(dir) {
+  const g = focused();
+  if (!g) return;
 }
 
 /** Cross held on a choice that can't be taken back: it happens once the ring round its icon is full. */

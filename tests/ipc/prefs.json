@@ -11,6 +11,7 @@
   "steam_devtools": false,
   "steam_guide": true,
   "online_art": true,
+  "details_language": "",
   "screensaver_minutes": 5,
   "dock": true,
   "check_updates": true,

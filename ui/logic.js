@@ -191,7 +191,7 @@ export function byPlayed(a, b) {
 /**
  * A choice in a game's menu. `hold`: it can't be taken back, so Cross is held for it, as the hint says; `note` says
  * beforehand what it does.
- * @typedef {{ kind: 'play' | 'about' | 'favourite' | 'art' | 'captures' | 'hide' | 'close' | 'remove', label: string, icon: import('./icons.js').IconId,
+ * @typedef {{ kind: 'play' | 'about' | 'favourite' | 'art' | 'platform' | 'captures' | 'hide' | 'close' | 'remove', label: string, icon: import('./icons.js').IconId,
  *   hold?: string, note?: string }} DetailChoice
  */
 
@@ -216,6 +216,7 @@ export function detailChoices(g, running, closer = null, captures = false) {
     { kind: 'hide', label: 'Hide this game', icon: 'i-eye-off' },
   ];
   if (captures) choices.splice(4, 0, { kind: 'captures', label: 'Your captures', icon: 'i-camera' });
+  choices.splice(choices.length - 1, 0, { kind: 'platform', label: `Platform: ${platformText(g)}`, icon: 'i-controller', note: '← → to change' });
   if (running === g.id && closer?.id === g.id && closer.closable) {
     choices.push(
       closer.force_close
@@ -564,6 +565,45 @@ export function stepTrailers(level, dir) {
   return levels[Math.max(0, Math.min(levels.length - 1, levels.indexOf(level) + dir))];
 }
 
+/** The platforms a game's menu steps through, after Automatic. */
+export const PLATFORMS = [
+  'PC', 'Nintendo Switch', 'Nintendo Switch 2', 'Wii U', 'Wii', 'GameCube', 'Nintendo 64', 'Super Nintendo', 'NES',
+  'Nintendo 3DS', 'Nintendo DS', 'Game Boy Advance', 'Game Boy', 'PlayStation', 'PlayStation 2', 'PlayStation 3',
+  'PlayStation 4', 'PlayStation 5', 'PSP', 'PlayStation Vita', 'Xbox', 'Xbox 360', 'Xbox One', 'Dreamcast',
+  'Sega Saturn', 'Mega Drive', 'Arcade',
+];
+
+/** A game's platform as its menu shows it: the player's, else Lamplit's reading, marked Automatic. @param {Game} g */
+export function platformText(g) {
+  if (g.platform_choice) return g.platform_choice;
+  return g.platform ? `Automatic (${g.platform})` : 'Automatic';
+}
+
+/**
+ * The next platform choice that way: null is Automatic, before the list. One the player typed elsewhere starts from
+ * Automatic.
+ * @param {string | null} now @param {number} dir @returns {string | null}
+ */
+export function stepPlatform(now, dir) {
+  const all = [null, ...PLATFORMS];
+  const at = Math.max(0, all.indexOf(now));
+  return all[(at + dir + all.length) % all.length];
+}
+
+/** The next screen language that way, staying at either end. @param {string} now @param {number} dir */
+/** About's languages: code and name, Automatic ('') first. Steam has each; IGDB has English only. */
+export const DETAILS_LANGUAGES = /** @type {[string, string][]} */ ([
+  ['', 'Automatic (this PC)'], ['en', 'English'], ['es', 'Español (España)'], ['es-419', 'Español (Latinoamérica)'],
+  ['pt', 'Português'], ['pt-br', 'Português (Brasil)'], ['fr', 'Français'], ['de', 'Deutsch'], ['it', 'Italiano'],
+  ['ja', '日本語'], ['ko', '한국어'], ['zh', '中文'], ['ru', 'Русский'], ['pl', 'Polski'],
+]);
+
+/** The next language that way, staying at either end. @param {string} now @param {number} dir */
+export function stepDetailsLanguage(now, dir) {
+  const codes = DETAILS_LANGUAGES.map(([c]) => c);
+  return codes[Math.max(0, Math.min(codes.length - 1, Math.max(0, codes.indexOf(now)) + dir))];
+}
+
 /** @type {Record<import('./api.js').EdgeTarget, string>} */
 const EDGE_TARGETS = { nothing: 'Nothing', cross: 'Cross', circle: 'Circle', triangle: 'Triangle', square: 'Square', l1: 'L1', r1: 'R1', options: 'Options' };
 
@@ -831,6 +871,18 @@ export function sectionRows(key, state) {
     rows.push({ kind: 'startup', label: 'Start when I sign in', value: state.startup ? onOff(state.startup.enabled) : 'Unknown', note: 'Older installations may ask for admin rights when switched off.' });
     rows.push({ kind: 'setup', label: "Repair Steam's background service", note: 'Stops Steam asking for admin rights.', value: '' });
     rows.push({ kind: 'onlineart', label: "Find art online (sends game names to Steam's store)", value: onOff(prefs?.online_art) });
+    const language = DETAILS_LANGUAGES.find(([c]) => c === (prefs?.details_language ?? ''))?.[1] ?? 'Automatic (this PC)';
+    rows.push({ kind: 'detailslang', adjust: true, label: "Language of game descriptions (Steam's; IGDB's are in English)", value: language });
+    if (state.igdb === 'ready') {
+      rows.push({ kind: 'igdbremove', label: 'IGDB (details of games Steam doesn\'t have)', value: 'Remove', tone: 'good', note: 'About uses IGDB for emulated games and recompilations.' });
+    } else if (state.igdb === 'id') {
+      rows.push({ kind: 'igdbsecret', label: 'IGDB Client Secret', value: 'Paste from clipboard', note: 'Now copy the Client Secret of the same Twitch application.' });
+    } else {
+      rows.push({ kind: 'igdbid', label: 'IGDB (details of games Steam doesn\'t have)', value: 'Paste Client ID', note: 'Make an application at dev.twitch.tv/console and copy its Client ID first.' });
+    }
+    rows.push(state.steamgriddb
+      ? { kind: 'sgdbremove', label: 'SteamGridDB key (more covers in Change art)', value: 'Remove', tone: 'good', note: 'Change art also searches SteamGridDB.' }
+      : { kind: 'sgdbpaste', label: 'SteamGridDB key (more covers in Change art)', value: 'Paste from clipboard', note: 'Copy your API key from steamgriddb.com > Preferences > API first.' });
     rows.push({ label: 'Display', value: state.display ?? 'Unknown' });
     rows.push({ kind: 'report', label: 'Save a report', value: 'Preview before saving' });
     rows.push({ kind: 'restore', label: "Restore Lamplit's changes", value: state.restore.running ? 'Restoring…' : '', icon: 'i-restart', hold: 'Hold to restore', note: 'Restores the settings Lamplit changed and turns its automatic changes off.' });

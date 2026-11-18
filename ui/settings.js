@@ -9,7 +9,7 @@ import * as api from './api.js';
 import { showHints, toast } from './hints.js';
 import { hold, letGo } from './hold.js';
 import { glyph, labelled, setGames, showInfo } from './library.js';
-import { SAVER_DEFAULT, SECTIONS, focusIndex, quietMode, rowKey, sectionRows, sectionSummary, stepAutoOff, stepEdgeTarget, stepInterfaceSounds, stepSaverMinutes, stepTrailers, visibleSections } from './logic.js';
+import { SAVER_DEFAULT, SECTIONS, focusIndex, quietMode, rowKey, sectionRows, sectionSummary, stepAutoOff, stepDetailsLanguage, stepEdgeTarget, stepInterfaceSounds, stepSaverMinutes, stepTrailers, visibleSections } from './logic.js';
 import { showScreensaver, warmScreensaver } from './screensaver/index.js';
 import { setSoundLevel, sfx } from './sounds.js';
 import { SPRINGS } from './springs.js';
@@ -172,7 +172,7 @@ const orKeep = (call) => call.catch(() => undefined);
 
 /** Everything the settings show, fetched together. */
 async function refreshSettings() {
-  const [stores, overlays, quiet, startup, sound, accessories, prefs, display, steamgriddb] = await Promise.all([
+  const [stores, overlays, quiet, startup, sound, accessories, prefs, display, steamgriddb, igdb] = await Promise.all([
     orKeep(api.storesStatus()),
     orKeep(api.overlayState()),
     orKeep(api.quietState()),
@@ -182,6 +182,7 @@ async function refreshSettings() {
     orKeep(api.prefsState()),
     orKeep(api.displayMode()),
     orKeep(api.steamgriddbState()),
+    orKeep(api.igdbState()),
   ]);
   if (stores) setStores(stores);
   state.overlays = overlays ?? state.overlays;
@@ -192,6 +193,7 @@ async function refreshSettings() {
   state.prefs = prefs ?? state.prefs;
   state.display = display ?? state.display;
   state.steamgriddb = steamgriddb ?? state.steamgriddb;
+  state.igdb = igdb ?? state.igdb;
   if (state.mode === 'settings') renderSettings();
 }
 
@@ -329,6 +331,7 @@ export async function adjustSetting(dir) {
     } else if (row.kind === 'saverafter') await adjustScreensaver(dir);
     else if (row.kind === 'interfacesounds') await adjustInterfaceSounds(dir);
     else if (row.kind === 'trailers') await adjustTrailers(dir);
+    else if (row.kind === 'detailslang') await adjustDetailsLanguage(dir);
     else if (row.kind === 'edgebutton') await adjustEdgeButton(/** @type {import('./api.js').EdgeButton} */ (row.key), dir);
     else await adjustHeadset(row.kind, dir);
   } catch (e) {
@@ -371,6 +374,22 @@ async function adjustTrailers(dir) {
     state.prefs = await api.prefsSetTrailers(next);
   } finally {
     trailersBusy = false;
+  }
+}
+
+/** A held direction steps from the last saved language; the page changes language at once. @param {number} dir */
+let languageBusy = false;
+
+/** A held direction steps from the last saved language. @param {number} dir */
+async function adjustDetailsLanguage(dir) {
+  if (languageBusy || !state.prefs) return;
+  const next = stepDetailsLanguage(state.prefs.details_language ?? '', dir);
+  if (next === (state.prefs.details_language ?? '')) return;
+  languageBusy = true;
+  try {
+    state.prefs = await api.prefsSetDetailsLanguage(next);
+  } finally {
+    languageBusy = false;
   }
 }
 
@@ -508,6 +527,21 @@ export async function selectSetting() {
       state.startup = await api.startupSet(!state.startup?.enabled);
     } else if (row.kind === 'onlineart') {
       state.prefs = await api.prefsSetOnlineArt(!state.prefs?.online_art);
+    } else if (row.kind === 'igdbid') {
+      state.igdb = await api.igdbPasteClientId();
+      toast('Client ID saved. Now copy the Client Secret and paste it on the next row.');
+    } else if (row.kind === 'igdbsecret') {
+      state.igdb = await api.igdbPasteSecret();
+      toast('IGDB is ready. About shows details of games Steam doesn\'t have.');
+    } else if (row.kind === 'igdbremove') {
+      state.igdb = await api.igdbRemove();
+      toast('IGDB credentials removed.');
+    } else if (row.kind === 'sgdbpaste') {
+      state.steamgriddb = await api.steamgriddbPasteKey();
+      toast('SteamGridDB key saved. Change art searches it too now.');
+    } else if (row.kind === 'sgdbremove') {
+      state.steamgriddb = await api.steamgriddbRemoveKey();
+      toast('SteamGridDB key removed.');
     } else if (row.kind === 'checkupdates') {
       state.prefs = await api.prefsSetCheckUpdates(!(state.prefs?.check_updates ?? true));
     } else if (row.kind === 'update') {

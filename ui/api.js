@@ -45,6 +45,8 @@ const tauri = /** @type {any} */ (window).__TAURI__;
  * @property {boolean} hidden  left out of the row; Settings lists it
  * @property {Art} art
  * @property {ArtChoice | null} art_choice  null: Lamplit's own match
+ * @property {string | null} platform  what it is played as: the player's choice, else read from its folder or emulator
+ * @property {string | null} platform_choice  the player's choice; null: Lamplit's own reading
  * @property {boolean} manual  added by hand, so it can be removed again
  * @property {StoreKey[]} requires  store apps that must run and be signed in for the game
  */
@@ -60,12 +62,14 @@ const tauri = /** @type {any} */ (window).__TAURI__;
 /**
  * Steam's About data. Images are asset URLs of files in Lamplit's art folder; trailer.url is an H.264 DASH manifest.
  * @typedef {object} GameDetails
- * @property {number} appid
+ * @property {number} appid  0 for details from IGDB
+ * @property {'steam' | 'igdb' | ''} source
  * @property {string} description
  * @property {string[]} developers
  * @property {string[]} publishers
  * @property {string} released
  * @property {string[]} genres
+ * @property {string[]} platforms  IGDB's; empty from Steam
  * @property {{ thumb: string, full: string }[]} screenshots
  * @property {{ url: string, poster: string } | null} trailer
  */
@@ -211,6 +215,7 @@ const tauri = /** @type {any} */ (window).__TAURI__;
  * @property {boolean} steam_devtools  Lamplit opens Steam's DevTools port (the PS button guard and Steam's pop-ups)
  * @property {boolean} steam_guide  Lamplit keeps Steam's Guide Button Focuses Steam setting off
  * @property {boolean} online_art  art comes from Steam's store too
+ * @property {string} details_language  About's descriptions, '' for the PC's language
  * @property {number} screensaver_minutes  minutes without input before the screensaver, 0 for never
  * @property {boolean} dock  holding PS over a game opens the dock rather than the home screen
  * @property {boolean} check_updates  checks GitHub automatically at most once a day after start
@@ -448,6 +453,21 @@ export const prefsSetSteamDevtools = (on) => call('prefs_set_steam_devtools', { 
 export const prefsSetSteamGuide = (on) => call('prefs_set_steam_guide', { on });
 /** @param {boolean} on @returns {Promise<Prefs>} */
 export const prefsSetOnlineArt = (on) => call('prefs_set_online_art', { on });
+/** @typedef {'none' | 'id' | 'ready'} IgdbState  what Settings has of the IGDB (Twitch) credentials */
+/** @returns {Promise<IgdbState>} */
+export const igdbState = () => call('igdb_state');
+/** Takes the Client ID on the clipboard. @returns {Promise<IgdbState>} */
+export const igdbPasteClientId = () => call('igdb_paste_client_id');
+/** Takes the Client Secret on the clipboard, once Twitch accepts the pair. @returns {Promise<IgdbState>} */
+export const igdbPasteSecret = () => call('igdb_paste_secret');
+/** @returns {Promise<IgdbState>} */
+export const igdbRemove = () => call('igdb_remove');
+/** @param {string} language '', 'en' or 'es' @returns {Promise<Prefs>} */
+/** @returns {Promise<string>} Windows' locale for the player: 'es-CL' */
+/** @param {string} language '' for the PC's @returns {Promise<Prefs>} */
+export const prefsSetDetailsLanguage = (language) => call('prefs_set_details_language', { language });
+/** @param {string} id @param {string | null} platform null: Lamplit's own reading @returns {Promise<Game[]>} */
+export const librarySetPlatform = (id, platform) => call('library_set_platform', { id, platform });
 /** @returns {Promise<boolean>} whether a pass is looking for art now */
 export const libraryArtBusy = () => call('library_art_busy');
 /** @returns {Promise<boolean>} whether the player has given a SteamGridDB key */

@@ -344,6 +344,7 @@ function showNews(news) {
 
 /** @param {import('../api.js').DockShow} show */
 function onDock(show) {
+  // Settings may have changed the language since the dock last opened.
   if (show.mode === 'open') open();
   else if (show.mode === 'closed') fold();
   else showNews(show);

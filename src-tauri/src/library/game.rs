@@ -23,6 +23,10 @@ pub struct Game {
     pub art: Art,
     /// The art the player chose in Change art; None for Lamplit's own match.
     pub art_choice: Option<ArtChoice>,
+    /// The platform it is played as: the player's choice, else one read from its folder or emulator (platform.rs).
+    pub platform: Option<String>,
+    /// The platform the player chose in the game's menu; None for Lamplit's own reading.
+    pub platform_choice: Option<String>,
     /// Added by hand (Settings > Add a game), so the player can remove it again.
     pub manual: bool,
     /// Store apps that must run and be signed in: the game's own, plus any its publisher adds.
@@ -84,6 +88,8 @@ impl Game {
             hidden: false,
             art: Art::default(),
             art_choice: None,
+            platform: None,
+            platform_choice: None,
             manual: false,
             requires: Vec::new(),
             steam_appid: None,

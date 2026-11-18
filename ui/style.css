@@ -166,6 +166,7 @@ body.still .hero, body.morphing .hero, #stage[data-stage] .hero { animation-play
 }
 #played:not(:empty) + #playtime:not(:empty)::before { content: '·'; margin-right: 1.4vh; }
 
+/* The focused game's description (Steam's in the chosen language, or IGDB's), under its logo and pills. */
 .pill.quiet { background: rgb(255 255 255 / .1); border-color: rgb(255 255 255 / .25); }
 .pill.warn { background: rgb(255 190 80 / .2); border-color: rgb(255 190 80 / .6); color: #ffd58a; }
 .pill:empty { display: none; }

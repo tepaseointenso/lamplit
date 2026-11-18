@@ -168,6 +168,8 @@ pub struct Prefs {
     /// Art Steam's library cache doesn't have comes from Steam's store, which then learns the names of the games
     /// outside Steam (art.rs).
     pub online_art: bool,
+    /// The language of About's descriptions (library/lang.rs), "" for the PC's.
+    pub details_language: String,
     /// Minutes without input before the page shows its screensaver, 0 for never (ui/screensaver). Prefs written while
     /// the screensaver still had a 2D and 3D choice also hold a `screensaver_style`, which serde passes over.
     pub screensaver_minutes: u32,
@@ -193,6 +195,7 @@ impl Default for Prefs {
             steam_devtools: false,
             steam_guide: true,
             online_art: true,
+            details_language: String::new(),
             screensaver_minutes: 5,
             dock: true,
             check_updates: true,

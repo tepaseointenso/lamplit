@@ -387,6 +387,45 @@ pub async fn prefs_set_online_art(app: AppHandle, on: bool) -> Result<Prefs> {
     blocking(move || library::set_online_art(&app, on).map(|()| prefs::get(&app))).await?
 }
 
+/// Searches IGDB, Steam and SteamGridDB again for every game without details or art; returns at once, and a notice
+/// What Settings shows of the IGDB credentials: none, the Client ID only, or both.
+#[tauri::command]
+pub async fn igdb_state() -> Result<library::IgdbState> {
+    blocking(library::igdb_state).await
+}
+
+#[tauri::command]
+pub async fn igdb_paste_client_id() -> Result<library::IgdbState> {
+    blocking(library::igdb_paste_client_id).await?
+}
+
+/// Goes online: Twitch checks the pair.
+#[tauri::command]
+pub async fn igdb_paste_secret(app: AppHandle) -> Result<library::IgdbState> {
+    blocking(move || library::igdb_paste_secret(&app)).await?
+}
+
+#[tauri::command]
+pub async fn igdb_remove() -> Result<library::IgdbState> {
+    blocking(library::igdb_remove).await?
+}
+
+/// Windows' locale for the player ("es-CL"): the page's language while Settings says Automatic.
+/// The language of About's descriptions, "" for the PC's. The page reads the prefs again.
+#[tauri::command]
+pub async fn prefs_set_details_language(app: AppHandle, language: String) -> Result<Prefs> {
+    if !library::details_language_known(&language) {
+        return Err(Error::Player("Lamplit has no descriptions in that language.".into()));
+    }
+    blocking(move || prefs::change(&app, |p| p.details_language = language).map(|()| prefs::get(&app))).await?
+}
+
+/// The platform the player chose for a game; None for Lamplit's own reading. Returns every game, with the change.
+#[tauri::command]
+pub async fn library_set_platform(app: AppHandle, id: String, platform: Option<String>) -> Result<Vec<Game>> {
+    blocking(move || library::set_platform(&app, &id, platform)).await?
+}
+
 /// Whether a pass is looking for covers, backgrounds and logos now; the art-busy event says when that changes.
 #[tauri::command]
 pub fn library_art_busy() -> bool {
