@@ -16,6 +16,8 @@ pub enum Event<'a> {
     Games(&'a [Game]),
     /// Art for one game came in.
     Art { id: &'a str, art: &'a Art },
+    /// A pass looking for covers, backgrounds and logos started (true) or ended (false).
+    ArtBusy(bool),
     /// A controller press for the page while Lamplit is in front: "up", "ok", "back" and so on, or Cross let go
     /// ("ok-up").
     Pad(&'a str),
@@ -89,6 +91,7 @@ impl Event<'_> {
         match self {
             Event::Games(_) => "games",
             Event::Art { .. } => "art",
+            Event::ArtBusy(_) => "art-busy",
             Event::Pad(_) => "pad",
             Event::PadKind(_) => "pad-kind",
             Event::Play(_) => "play",
@@ -150,6 +153,7 @@ mod tests {
         };
         assert_eq!(payload(&Event::RestoreStep(step)), ipc_fixture!("restore-step"));
         assert_eq!(payload(&Event::Accessories), Value::Null);
+        assert_eq!(payload(&Event::ArtBusy(true)), json!(true));
         assert_eq!(
             payload(&Event::InterfaceSounds(crate::prefs::InterfaceSounds::Normal)),
             ipc_fixture!("prefs")["interface_sounds"]

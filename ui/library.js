@@ -126,6 +126,7 @@ function setLogo(g) {
   if (!url) return showTitle();
   els.logo.onload = () => {
     if (key === logoKey) els.logo.classList.add('on');
+    if (key !== logoKey) return;
   };
   els.logo.onerror = showTitle;
   els.logo.alt = g.name;

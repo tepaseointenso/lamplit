@@ -58,10 +58,14 @@ pub async fn library_set_hidden(app: AppHandle, id: String, on: bool) -> Result<
     blocking(move || library::set_hidden(&app, &id, on)).await?
 }
 
-/// What Steam's store has for `query`, for Change art. Goes online.
+/// What Steam's store or SteamGridDB (`source`, Change art's tab) has for `query`. Goes online.
 #[tauri::command]
-pub async fn library_art_search(app: AppHandle, query: String) -> Result<Vec<library::Candidate>> {
-    blocking(move || library::art_candidates(&app, &query)).await?
+pub async fn library_art_search(
+    app: AppHandle,
+    query: String,
+    source: library::ArtSource,
+) -> Result<Vec<library::Candidate>> {
+    blocking(move || library::art_candidates(&app, &query, source)).await?
 }
 
 /// Steam's details and local screenshots, only while Find art online is on.
@@ -381,6 +385,29 @@ pub async fn prefs_set_steam_guide(app: AppHandle, on: bool) -> Result<Prefs> {
 #[tauri::command]
 pub async fn prefs_set_online_art(app: AppHandle, on: bool) -> Result<Prefs> {
     blocking(move || library::set_online_art(&app, on).map(|()| prefs::get(&app))).await?
+}
+
+/// Whether a pass is looking for covers, backgrounds and logos now; the art-busy event says when that changes.
+#[tauri::command]
+pub fn library_art_busy() -> bool {
+    library::art_busy()
+}
+
+/// Whether the player has given a SteamGridDB key.
+#[tauri::command]
+pub async fn steamgriddb_state() -> Result<bool> {
+    blocking(library::steamgriddb_key_set).await
+}
+
+/// Takes the SteamGridDB key on the clipboard, once SteamGridDB accepts it. Goes online.
+#[tauri::command]
+pub async fn steamgriddb_paste_key(app: AppHandle) -> Result<bool> {
+    blocking(move || library::steamgriddb_paste_key(&app).map(|()| library::steamgriddb_key_set())).await?
+}
+
+#[tauri::command]
+pub async fn steamgriddb_remove_key() -> Result<bool> {
+    blocking(|| library::steamgriddb_remove_key().map(|()| library::steamgriddb_key_set())).await?
 }
 
 /// Minutes without input before the screensaver, 0 for never. The page reads the prefs again, so nothing else follows.

@@ -54,6 +54,9 @@ pub struct Art {
 pub enum ArtChoice {
     /// The art of this app on Steam's store.
     Steam(u32),
+    /// The art of this game on SteamGridDB (sgdb.rs), with the player's own key.
+    #[serde(rename = "steamgriddb")]
+    SteamGridDb(u32),
     /// No art: the cover shows the game's name.
     None,
 }
@@ -119,7 +122,7 @@ mod tests {
 
     #[test]
     fn art_choices_go_both_ways_as_in_their_fixture() {
-        let choices = [ArtChoice::Steam(1_091_500), ArtChoice::None];
+        let choices = [ArtChoice::Steam(1_091_500), ArtChoice::SteamGridDb(5_247_009), ArtChoice::None];
         assert_eq!(serde_json::to_value(choices).unwrap(), ipc_fixture!("art-choice"));
         let back: Vec<ArtChoice> = serde_json::from_value(ipc_fixture!("art-choice")).unwrap();
         assert_eq!(back, choices);

@@ -9,9 +9,10 @@ mod discover;
 mod game;
 mod manual;
 mod name_match;
+pub(crate) mod sgdb;
 mod user_data;
 
-pub use art::{Candidate, candidates as art_candidates};
+pub use art::{Candidate, Source as ArtSource, candidates as art_candidates};
 pub use details::{Details, get as game_details};
 pub use game::{Art, ArtChoice, Game, Launch};
 pub use manual::{Folder, Program, browse};
@@ -221,8 +222,10 @@ pub fn set_hidden(app: &AppHandle, id: &str, on: bool) -> Result<Vec<Game>> {
 pub fn set_art(app: &AppHandle, id: &str, choice: Option<ArtChoice>) -> Result<Vec<Game>> {
     let asks = &app.state::<Library>().art_asks;
     let n = asks.ask(id);
-    if let Some(ArtChoice::Steam(appid)) = choice {
-        art::fetch(app, appid)?;
+    match choice {
+        Some(ArtChoice::Steam(appid)) => art::fetch(app, appid)?,
+        Some(ArtChoice::SteamGridDb(id)) => art::fetch_sgdb(app, id)?,
+        Some(ArtChoice::None) | None => {}
     }
     if !asks.save_if_newest(id, n, || change(app, id, |e| e.art = choice))? {
         log::info!("{id}: art choice {choice:?} dropped, the player has chosen again since");
@@ -329,6 +332,34 @@ pub fn set_online_art(app: &AppHandle, on: bool) -> Result<()> {
         scan(app);
     }
     Ok(())
+}
+
+fn clipboard() -> Result<String> {
+    crate::win::clipboard::text().ok_or_else(|| Error::Player("The clipboard has no text. Copy it first.".into()))
+}
+
+/// Whether a pass is looking for art now.
+pub fn art_busy() -> bool {
+    art::busy()
+}
+
+/// Whether the player has given Lamplit a SteamGridDB key, for Settings > System.
+pub fn steamgriddb_key_set() -> bool {
+    sgdb::has_key()
+}
+
+/// Takes the SteamGridDB key the player copied, from the clipboard, once SteamGridDB accepts it.
+pub fn steamgriddb_paste_key(app: &AppHandle) -> Result<()> {
+    let text = crate::win::clipboard::text()
+        .ok_or_else(|| Error::Player("The clipboard has no text. Copy your SteamGridDB API key first.".into()))?;
+    sgdb::set_key(&art::SteamStore::new(app), &text)?;
+    // Games Steam's store has no cover for get one from SteamGridDB now.
+    scan(app);
+    Ok(())
+}
+
+pub fn steamgriddb_remove_key() -> Result<()> {
+    sgdb::remove_key()
 }
 
 #[cfg(test)]

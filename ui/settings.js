@@ -172,7 +172,7 @@ const orKeep = (call) => call.catch(() => undefined);
 
 /** Everything the settings show, fetched together. */
 async function refreshSettings() {
-  const [stores, overlays, quiet, startup, sound, accessories, prefs, display] = await Promise.all([
+  const [stores, overlays, quiet, startup, sound, accessories, prefs, display, steamgriddb] = await Promise.all([
     orKeep(api.storesStatus()),
     orKeep(api.overlayState()),
     orKeep(api.quietState()),
@@ -181,6 +181,7 @@ async function refreshSettings() {
     orKeep(api.accessoriesState()),
     orKeep(api.prefsState()),
     orKeep(api.displayMode()),
+    orKeep(api.steamgriddbState()),
   ]);
   if (stores) setStores(stores);
   state.overlays = overlays ?? state.overlays;
@@ -190,6 +191,7 @@ async function refreshSettings() {
   state.accessories = accessories ?? state.accessories;
   state.prefs = prefs ?? state.prefs;
   state.display = display ?? state.display;
+  state.steamgriddb = steamgriddb ?? state.steamgriddb;
   if (state.mode === 'settings') renderSettings();
 }
 

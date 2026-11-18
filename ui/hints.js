@@ -49,7 +49,7 @@ export function showHints() {
   } else if (state.mode === 'details' && state.art.open) {
     html = state.art.editing
       ? b('ok', 'Select') + b('square', 'Delete') + b('triangle', 'Space') + b('back', 'Cancel')
-      : b('ok', 'Select') + b('square', 'Edit search') + b('back', 'Back');
+      : b('ok', 'Select') + b('square', 'Edit search') + (state.steamgriddb ? b('tabs', 'Steam / SteamGridDB') : '') + b('back', 'Back');
   } else if (state.mode === 'details') {
     // The choice in focus, or the last one when the one in focus went (a game that ended takes Close game with it).
     const list = detailChoices(g, state.running, state.closer, state.captures.items.length > 0);

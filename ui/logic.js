@@ -16,7 +16,7 @@
 
 // ---------- the button hints ----------
 
-/** @typedef {'ok' | 'back' | 'triangle' | 'square' | 'menu' | 'adjust'} HintButton */
+/** @typedef {'ok' | 'back' | 'triangle' | 'square' | 'menu' | 'adjust' | 'tabs'} HintButton */
 
 /**
  * How each button the hints name looks, as [class, glyph]: PlayStation's symbols, or Xbox's letters, which most
@@ -31,6 +31,7 @@ const FACES = {
     square: ['options', '□'],
     menu: ['options', '≡'],
     adjust: ['options', '↔'],
+    tabs: ['options', 'L1 R1'],
   },
   xbox: {
     ok: ['xbox-a', 'A'],
@@ -39,6 +40,7 @@ const FACES = {
     square: ['xbox-x', 'X'],
     menu: ['options', '≡'],
     adjust: ['options', '↔'],
+    tabs: ['options', 'LB RB'],
   },
 };
 

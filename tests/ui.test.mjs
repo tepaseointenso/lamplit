@@ -1114,7 +1114,7 @@ for (const vp of [{ width: 1920, height: 1080 }, { width: 3840, height: 2160 }])
   await row("Restore Lamplit's changes").dispatchEvent('pointerdown');
   await page.clock.runFor(1000);
   v = await view();
-  check('a full hold starts restore and disables conflicting System actions', v.calls.filter((c) => c === 'restore_changes').length === 1 && v.disabled.length === 5 && v.text.includes('Restoring…'), JSON.stringify(v));
+  check('a full hold starts restore and disables conflicting System actions', v.calls.filter((c) => c === 'restore_changes').length === 1 && v.disabled.length === 10 && v.text.includes('Restoring…'), JSON.stringify(v));
   const from = v.calls.length;
   await row("Restore Lamplit's changes").dispatchEvent('pointerdown');
   await page.clock.runFor(1000);
@@ -1145,7 +1145,7 @@ for (const vp of [{ width: 1920, height: 1080 }, { width: 3840, height: 2160 }])
   v = await view();
   check('the final report survives closing Settings and startup is read back', v.text.includes('Restore report') && v.text.includes('Close Ubisoft Connect, then try again.') && (await row('Start when I sign in').textContent()).endsWith('Off') && v.disabled.length === 0, JSON.stringify(v));
   // Down past the System rows (Save a report among them) to the last line of the restore report.
-  for (let i = 0; i < 8; i++) await page.keyboard.press('ArrowDown');
+  for (let i = 0; i < 13; i++) await page.keyboard.press('ArrowDown');
   await settled(page);
   const reportVisible = await page.evaluate(() => {
     const row = document.querySelector('#settingsList .row.focus');
@@ -1300,7 +1300,7 @@ for (const vp of [{ width: 1920, height: 1080 }, { width: 3840, height: 2160 }])
   await page.keyboard.press('Escape');
   await page.keyboard.press('ArrowRight');
   await page.keyboard.press('i');
-  for (let i = 0; i < 4; i++) await page.keyboard.press('ArrowDown');
+  for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowDown');
   d = await details();
   check('Details stop at the last choice', d.focus === 'Hide this game', d.focus);
   await page.keyboard.press('Enter');
@@ -1454,7 +1454,7 @@ for (const vp of [{ width: 1920, height: 1080 }, { width: 3840, height: 2160 }])
   await page.keyboard.press('i');
   let s = await state(page);
   check('Details of the running game offer Back to game', s.hint.includes('✕Back to game'), s.hint);
-  for (let i = 0; i < 4; i++) await page.keyboard.press('ArrowDown');
+  for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
   await idle(page);
   s = await state(page);
@@ -1694,7 +1694,7 @@ const findView = (page) =>
     };
   }, games);
   await page.keyboard.press('i');
-  for (let i = 0; i < 4; i++) await page.keyboard.press('ArrowDown');
+  for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
   await page.keyboard.press('ArrowRight');
   await page.keyboard.press('ArrowRight');
@@ -2098,7 +2098,7 @@ for (const vp of [{ width: 1920, height: 1080 }, { width: 3840, height: 2160 }, 
       s.library_set_art = ({ id, choice }) => {
         const g = s.list.find((x) => x.id === id);
         g.art_choice = choice;
-        g.art = { portrait: choice?.steam === found[0].appid ? found[0].portrait : null, hero: null, logo: null };
+        g.art = { portrait: choice?.steam === found[0].choice.steam ? found[0].portrait : null, hero: null, logo: null };
         return s.list;
       };
     },
@@ -2125,7 +2125,7 @@ for (const vp of [{ width: 1920, height: 1080 }, { width: 3840, height: 2160 }, 
   await page.keyboard.press('Enter');
   await idle(page);
   let p = await picker();
-  check('Change art searches Steam for the game\'s name', p.open && !p.menu && JSON.stringify(p.lastCall) === '["library_art_search",{"query":"Cyberpunk 2077"}]', JSON.stringify(p));
+  check('Change art searches Steam for the game\'s name', p.open && !p.menu && JSON.stringify(p.lastCall) === '["library_art_search",{"query":"Cyberpunk 2077","source":"steam"}]', JSON.stringify(p));
   check('the matches show as covers, with no art below', JSON.stringify(p.tiles) === '["Cyberpunk 2077","Cyberpunk 2077: Phantom Liberty"]' && JSON.stringify(p.choices) === '["No art, show the name"]', JSON.stringify(p));
   check('focus starts on the first match, which the lifted cover shows', p.focus === 'Cyberpunk 2077' && p.face.art && p.face.image.includes(encodeURIComponent(found[0].portrait)), JSON.stringify(p));
   check('Change art hints Select, Edit search and Back', p.hint === '✕Select□Edit search○Back', p.hint);
@@ -2174,7 +2174,7 @@ for (const vp of [{ width: 1920, height: 1080 }, { width: 3840, height: 2160 }, 
   await page.keyboard.press('Enter');
   await idle(page);
   p = await picker();
-  check('Done searches for the words typed', !p.editing && JSON.stringify(p.lastCall) === '["library_art_search",{"query":"nothing"}]' && p.status.startsWith('Nothing on Steam\'s store matches "nothing"') && p.tiles.length === 0, JSON.stringify(p));
+  check('Done searches for the words typed', !p.editing && JSON.stringify(p.lastCall) === '["library_art_search",{"query":"nothing","source":"steam"}]' && p.status.startsWith('Nothing on Steam\'s store matches "nothing"') && p.tiles.length === 0, JSON.stringify(p));
   check('with no matches, focus is on the search', p.focus?.includes('nothing'), JSON.stringify(p));
   await page.keyboard.press('Enter');
   for (let i = 0; i < 'nothing'.length; i++) await page.keyboard.press('Backspace');
@@ -2203,7 +2203,7 @@ for (const vp of [{ width: 1920, height: 1080 }, { width: 3840, height: 2160 }, 
   await page.keyboard.press('Enter');
   await idle(page);
   p = await picker();
-  check('... and Done searches for those words', JSON.stringify(p.lastCall) === '["library_art_search",{"query":"other"}]', JSON.stringify(p.lastCall));
+  check('... and Done searches for those words', JSON.stringify(p.lastCall) === '["library_art_search",{"query":"other","source":"steam"}]', JSON.stringify(p.lastCall));
   await page.keyboard.press('Escape');
   p = await picker();
   check('○ goes back to the menu', !p.open && p.menu, JSON.stringify(p));
@@ -2283,7 +2283,7 @@ for (const vp of [{ width: 1920, height: 1080 }, { width: 3840, height: 2160 }, 
   const added = await page.evaluate(() => window.__calls.find((c) => c[0] === 'library_add_game'));
   check('Done adds the game', JSON.stringify(added) === `["library_add_game",{"exe":${JSON.stringify(program.exe)},"name":"Old Racer"}]`, JSON.stringify(added));
   let l = await lift();
-  check('then its cover lifts into Change art, searching for its name', !(await add()).open && s.focusName === 'Old Racer' && l.art && l.face === 'Old Racer' && JSON.stringify(s.lastCall) === '["library_art_search",{"query":"Old Racer"}]', JSON.stringify({ ...l, focus: s.focusName, last: s.lastCall }));
+  check('then its cover lifts into Change art, searching for its name', !(await add()).open && s.focusName === 'Old Racer' && l.art && l.face === 'Old Racer' && JSON.stringify(s.lastCall) === '["library_art_search",{"query":"Old Racer","source":"steam"}]', JSON.stringify({ ...l, focus: s.focusName, last: s.lastCall }));
   // Its menu offers Remove, which says the files stay, and happens once Cross is held.
   await page.keyboard.press('Escape');
   const choices = await page.evaluate(() => [...document.querySelectorAll('#dChoices .row')].map((r) => r.textContent));
@@ -3647,7 +3647,7 @@ for (const [viewport, scale] of [[{ width: 1920, height: 1080 }, 1], [{ width: 2
 // place.
 {
   const page = await open({ games: [game(1, { last_played: Math.floor(Date.now() / 1000) - 86400, play_minutes: 1860 }), game(2), game(3)] });
-  await page.evaluate((files) => (window.__settings = { library_art_search: files.map((portrait, i) => ({ appid: i + 1, name: `Match ${i + 1}`, portrait })) }), [art[0].portrait, art[0].hero, null]);
+  await page.evaluate((files) => (window.__settings = { library_art_search: files.map((portrait, i) => ({ choice: { steam: i + 1 }, name: `Match ${i + 1}`, portrait })) }), [art[0].portrait, art[0].hero, null]);
   /** What shows of a plate: its box, less its clip, moved by its translate. */
   const shown = (sel) =>
     page.evaluate((sel) => {
@@ -5180,6 +5180,64 @@ for (const dismiss of ['ok', 'back']) {
   await page.evaluate((items) => window.__capturesReady(items), ipc('captures'));
   await idle(page);
   check('a late captures reply cannot add another game\'s captures', !(await page.locator('#dChoices').textContent()).includes('Your captures'));
+  await close(page);
+}
+
+// SteamGridDB: the key is pasted from the clipboard in Settings > System and removed there; Change art then names
+// SteamGridDB, marks its matches, and sends a picked one back as a SteamGridDB choice.
+{
+  const page = await open({ games: [game(1, { name: 'Hades II' })] });
+  await page.evaluate((found) => {
+    const s = (window.__settings = { key: false, found });
+    s.steamgriddb_state = () => s.key;
+    s.steamgriddb_paste_key = () => (s.key = true);
+    s.steamgriddb_remove_key = () => (s.key = false);
+    s.library_art_search = ({ source }) => (source === 'steamgriddb' ? s.found.slice(2) : s.found.slice(0, 2));
+    s.library_set_art = () => { throw { kind: 'player', message: 'kept' }; };
+  }, ipc('art-candidates'));
+  const row = (label) => page.locator('#settingsList .row').filter({ has: page.locator('.label', { hasText: label }) }).first();
+  await page.keyboard.press('c');
+  await row('System').click();
+  await idle(page);
+  const value = async () => (await row('SteamGridDB key').textContent()) ?? '';
+  check('without a key, System offers to paste one', (await value()).endsWith('Paste from clipboard'), await value());
+  await row('SteamGridDB key').click();
+  await idle(page);
+  const calls = () => page.evaluate(() => window.__calls.map((c) => c[0]));
+  check('the key is pasted, and the row then offers to remove it', (await calls()).includes('steamgriddb_paste_key') && (await value()).endsWith('Remove'), await value());
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await idle(page);
+  await page.keyboard.press('i');
+  for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  await idle(page);
+  const tiles = () => page.evaluate(() => ({
+    tabs: [...document.querySelectorAll('#artTabs .art-tab')].map((t) => t.textContent + (t.classList.contains('on') ? ' (on)' : '')),
+    shown: getComputedStyle(document.getElementById('artTabs')).display !== 'none',
+    ids: [...document.querySelectorAll('#artTiles .tile')].map((t) => t.dataset.id),
+    hint: document.getElementById('hint').textContent,
+  }));
+  let t = await tiles();
+  check('with a key, Change art opens on the Steam tab', t.shown && JSON.stringify(t.tabs) === '["Steam (on)","SteamGridDB"]' && JSON.stringify(t.ids) === '["app:1091500","app:2138330"]' && t.hint.includes('Steam / SteamGridDB'), JSON.stringify(t));
+  await page.keyboard.press('PageDown');
+  await idle(page);
+  t = await tiles();
+  const searched = await page.evaluate(() => window.__calls.filter((c) => c[0] === 'library_art_search').at(-1));
+  check('R1 searches the same words on SteamGridDB', JSON.stringify(t.tabs) === '["Steam","SteamGridDB (on)"]' && JSON.stringify(t.ids) === '["sgdb:5247009"]' && JSON.stringify(searched?.[1]) === '{"query":"Hades II","source":"steamgriddb"}', JSON.stringify({ t, searched }));
+  await page.locator('#artTiles .tile[data-id="sgdb:5247009"]').click();
+  await idle(page);
+  const sent = await page.evaluate(() => window.__calls.filter((c) => c[0] === 'library_set_art').at(-1));
+  check('a SteamGridDB match is sent back as its choice', JSON.stringify(sent?.[1]?.choice) === '{"steamgriddb":5247009}', JSON.stringify(sent));
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await idle(page);
+  await page.keyboard.press('c');
+  await row('System').click();
+  await idle(page);
+  await row('SteamGridDB key').click();
+  await idle(page);
+  check('the key can be removed again', (await calls()).includes('steamgriddb_remove_key') && (await value()).endsWith('Paste from clipboard'), await value());
   await close(page);
 }
 await trailerTests({ browser, open, close, game, check, shots, holdClock });

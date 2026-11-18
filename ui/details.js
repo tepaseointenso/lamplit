@@ -6,7 +6,7 @@ import { showHints } from './hints.js';
 import { backToMenu } from './library.js';
 import { showSheet } from './lift.js';
 import { sfx } from './sounds.js';
-import { els, state } from './state.js';
+import { byId, els, state } from './state.js';
 import { showPicture } from './viewer.js';
 
 let requests = 0;

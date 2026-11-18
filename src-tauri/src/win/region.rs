@@ -11,3 +11,4 @@ pub fn code() -> String {
     let len = unsafe { GetUserDefaultGeoName(&mut buf) };
     String::from_utf16_lossy(&buf[..(len.max(1) - 1) as usize])
 }
+

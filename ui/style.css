@@ -678,6 +678,33 @@ body.launching .cover.focus { scale: 1.1; }
 
 /* Change art: the search, then Steam's matches as a row of covers, then no art and back to automatic. */
 #artPick h2 { margin-bottom: 2.4vh; }
+/* Where Change art searches: Steam's store or SteamGridDB, switched with L1 and R1. Only with a SteamGridDB key. */
+.art-tabs { display: none; gap: 1vh; margin: -1vh 0 2vh; }
+#artPick.has-tabs .art-tabs { display: flex; }
+#artPick.editing .art-tabs { display: none; }
+.art-tab {
+  padding: .8vh 2vh;
+  border-radius: 99px;
+  font-size: 1.8vh;
+  font-weight: 600;
+  color: var(--ink-dim);
+  background: rgb(255 255 255 / .06);
+  cursor: pointer;
+}
+.art-tab.on { color: #0b0b12; background: rgb(var(--accent)); }
+/* The capsule's chip while art is being looked for: a ring that turns, then the words. */
+#chips .chip.busy { gap: .8vh; color: var(--ink-dim); }
+#chips .chip.busy::before {
+  content: '';
+  width: 1.6vh;
+  height: 1.6vh;
+  border-radius: 50%;
+  border: .25vh solid rgb(255 255 255 / .25);
+  border-top-color: rgb(var(--accent));
+  animation: art-busy-spin 900ms linear infinite;
+}
+@keyframes art-busy-spin { to { transform: rotate(1turn); } }
+@media (prefers-reduced-motion: reduce) { #chips .chip.busy::before { animation-duration: 3s; } }
 #artField.focus { background: rgb(255 255 255 / .14); box-shadow: inset 0 0 0 .25vh #fff; }
 #artPick:not(.editing) #artQuery::after { display: none; }
 #artKeys { display: none; }

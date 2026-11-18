@@ -4,6 +4,7 @@
 // Change art. Downloads and lookups are cached in the data folder (art\<appid>\ and art.json).
 
 use super::name_match;
+use super::sgdb;
 use super::{Art, ArtChoice, Game};
 use crate::data::{self, data_dir};
 use crate::error::{Error, Result};
@@ -29,6 +30,10 @@ struct Db {
     lookups: HashMap<String, Lookup>,
     /// Appid → when its art was last fetched from the store.
     fetched: HashMap<u32, u64>,
+    /// Game id → SteamGridDB game found by name, for a game Steam's store has no cover for (None = searched, nothing
+    /// matched). Only with the player's SteamGridDB key.
+    #[serde(default)]
+    grid: HashMap<String, Lookup>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -128,20 +133,32 @@ fn complete(art: &Art) -> bool {
 pub fn from_disk(games: &mut [Game]) {
     let (db, cache) = (load(), steam_library_cache());
     for g in games {
+        if let Some(ArtChoice::SteamGridDb(id)) = g.art_choice {
+            g.art = sgdb::local(id);
+            continue;
+        }
         let known = g.steam_appid.or_else(|| db.lookups.get(&g.id).and_then(|l| l.appid));
         g.art = match shown_appid(g, known) {
             Some(appid) => local(cache.as_deref(), appid),
             None => Art::default(),
         };
+        if g.art_choice.is_none()
+            && g.art.portrait.is_none()
+            && let Some(id) = db.grid.get(&g.id).and_then(|l| l.appid)
+            && let found = sgdb::local(id)
+            && found.portrait.is_some()
+        {
+            g.art = found;
+        }
     }
 }
 
 /// The Steam app whose art `g` shows: the one the player chose, none if they chose no art, else `known` (the game's
-/// own, or the one found by name).
+/// own, or the one found by name). None too for art chosen on SteamGridDB, which isn't a Steam app.
 fn shown_appid(g: &Game, known: Option<u32>) -> Option<u32> {
     match g.art_choice {
         Some(ArtChoice::Steam(appid)) => Some(appid),
-        Some(ArtChoice::None) => None,
+        Some(ArtChoice::None | ArtChoice::SteamGridDb(_)) => None,
         None => known,
     }
 }
@@ -154,8 +171,24 @@ pub(super) fn details_appid(g: &Game) -> Option<u32> {
     g.steam_appid.or_else(|| load().lookups.get(&g.id).and_then(|l| l.appid))
 }
 
-/// Fetches the art still missing from Steam's store, and puts it in the library and tells the page, game by game.
+/// Whether a pass of `fetch_missing` is running, for a page that loads in the middle of one.
+static BUSY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+pub fn busy() -> bool {
+    BUSY.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Fetches the art still missing, and puts it in the library and tells the page, game by game. The page shows that
+/// it is looking while the pass runs.
 pub fn fetch_missing(app: &AppHandle, games: &[Game]) {
+    BUSY.store(true, std::sync::atomic::Ordering::Relaxed);
+    events::emit(app, Event::ArtBusy(true));
+    fetch_missing_now(app, games);
+    BUSY.store(false, std::sync::atomic::Ordering::Relaxed);
+    events::emit(app, Event::ArtBusy(false));
+}
+
+fn fetch_missing_now(app: &AppHandle, games: &[Game]) {
     let mut store = SteamStore::new(app);
     let mut db = load();
     let now = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs());
@@ -171,21 +204,62 @@ pub fn fetch_missing(app: &AppHandle, games: &[Game]) {
         .collect();
     let (assets, answered) = store.assets(&need);
 
+    let grid_key = sgdb::key();
     for (g, appid) in games.iter().zip(appids) {
-        let Some(appid) = appid else { continue };
-        if need.remove(&appid) && store.online() {
-            // Remember the attempt only when the store answered: until then the next scan tries again.
-            if download(&mut store, appid, &art[&appid], assets.get(&appid)) && answered.contains(&appid) {
-                db.fetched.insert(appid, now);
+        let mut found = match appid {
+            Some(appid) => {
+                if need.remove(&appid) && store.online() {
+                    // Remember the attempt only when the store answered: until then the next scan tries again.
+                    if download(&mut store, appid, &art[&appid], assets.get(&appid)) && answered.contains(&appid) {
+                        db.fetched.insert(appid, now);
+                    }
+                    art.insert(appid, local(cache.as_deref(), appid));
+                }
+                art[&appid].clone()
             }
-            art.insert(appid, local(cache.as_deref(), appid));
+            // Lamplit's own match found nothing on Steam: SteamGridDB may have it.
+            None if g.art_choice.is_none() => Art::default(),
+            None => continue,
+        };
+        if g.art_choice.is_none()
+            && found.portrait.is_none()
+            && let Some(key) = &grid_key
+            && let Some(grid) = grid_art(&mut store, &mut db, key, g, now)
+        {
+            found = grid;
         }
-        let found = &art[&appid];
-        if *found != g.art && app.state::<super::Library>().set_art(g, found) {
-            events::emit(app, Event::Art { id: &g.id, art: found });
+        if found != g.art && app.state::<super::Library>().set_art(g, &found) {
+            events::emit(app, Event::Art { id: &g.id, art: &found });
         }
     }
     save(&db);
+}
+
+/// The art of the SteamGridDB game that is `g`, for a game Steam's store has no cover for: looked up by name once
+/// (again after RETRY_SECS when nothing matched), and its cover, background and logo downloaded when it is new or
+/// its cover is still missing.
+fn grid_art(store: &mut SteamStore, db: &mut Db, key: &str, g: &Game, now: u64) -> Option<Art> {
+    let known = db.grid.get(&g.id).filter(|l| l.appid.is_some() || now.saturating_sub(l.at) < RETRY_SECS);
+    let id = match known {
+        Some(l) => l.appid?,
+        None if !store.online() => return None,
+        None => match sgdb::best_match(store, key, &g.name) {
+            Ok(found) => {
+                log::info!("art: {} → SteamGridDB game {found:?}", g.name);
+                db.grid.insert(g.id.clone(), Lookup { appid: found, at: now });
+                found?
+            }
+            Err(e) => {
+                store.failed(&format!("steamgriddb lookup for {}", g.name), &e);
+                return None;
+            }
+        },
+    };
+    if sgdb::local(id).portrait.is_none() && store.online() {
+        sgdb::fill(store, key, id);
+    }
+    let art = sgdb::local(id);
+    art.portrait.is_some().then_some(art)
 }
 
 /// Each game's Steam appid: the one the player chose, else its own, else one an earlier scan found by name, else a
@@ -284,23 +358,48 @@ fn candidate_urls(appid: u32, have: &Art, assets: Option<&Assets>) -> Vec<(&'sta
     out
 }
 
-/// A match on Steam's store the player can choose in Change art: an app, its name, and its cover when it has one.
+/// A match the player can choose in Change art: an app on Steam's store or a game on SteamGridDB (the choice the page
+/// sends back), its name, and its cover when it has one.
 #[derive(Serialize)]
 pub struct Candidate {
-    pub appid: u32,
+    pub choice: ArtChoice,
     pub name: String,
     pub portrait: Option<String>,
 }
 
-/// What a Change art search finds on Steam's store for `query`, each with its cover, which is downloaded to where the
-/// art of a chosen app goes.
-pub fn candidates(app: &AppHandle, query: &str) -> Result<Vec<Candidate>> {
+/// Where a Change art search looks: the tab the player is on.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Source {
+    Steam,
+    #[serde(rename = "steamgriddb")]
+    SteamGridDb,
+}
+
+/// What a Change art search finds for `query` on `source`, each with its cover, downloaded to where the art of a
+/// chosen match goes.
+pub fn candidates(app: &AppHandle, query: &str, source: Source) -> Result<Vec<Candidate>> {
     let mut store = SteamStore::new(app);
     if !store.online() {
         return Err(offline());
     }
-    let found = store.store_search(query).map_err(|e| unreached(&mut store, "search", &e))?;
-    log::info!("art: Change art search for {query}: {} found", found.len());
+    match source {
+        Source::Steam => {
+            let found = steam_candidates(&mut store, query)?;
+            log::info!("art: Change art search for {query}: {} found on Steam's store", found.len());
+            Ok(found)
+        }
+        Source::SteamGridDb => {
+            let key = sgdb::key()
+                .ok_or_else(|| Error::Player("Give Lamplit a SteamGridDB key first, in Settings > System.".into()))?;
+            grid_candidates(&mut store, &key, query)
+        }
+    }
+}
+
+/// What Steam's store has for `query`, each with its cover.
+fn steam_candidates(store: &mut SteamStore, query: &str) -> Result<Vec<Candidate>> {
+    let found = store.store_search(query).map_err(|e| unreached(store, "search", &e))?;
     let (assets, _) = store.assets(&found.iter().map(|(appid, _)| *appid).collect());
     let cache = steam_library_cache();
     let mut out = Vec::with_capacity(found.len());
@@ -309,11 +408,50 @@ pub fn candidates(app: &AppHandle, query: &str) -> Result<Vec<Candidate>> {
         if have.portrait.is_none() && store.online() {
             let cover =
                 candidate_urls(appid, &have, assets.get(&appid)).into_iter().filter(|(f, _)| *f == "portrait.jpg");
-            download_files(&mut store, appid, cover.collect());
+            download_files(store, appid, cover.collect());
         }
-        out.push(Candidate { appid, name, portrait: local(cache.as_deref(), appid).portrait });
+        out.push(Candidate {
+            choice: ArtChoice::Steam(appid),
+            name,
+            portrait: local(cache.as_deref(), appid).portrait,
+        });
     }
     Ok(out)
+}
+
+/// What SteamGridDB has for `query`, each with its cover.
+fn grid_candidates(store: &mut SteamStore, key: &str, query: &str) -> Result<Vec<Candidate>> {
+    match sgdb::search(store, key, query) {
+        Ok(found) => {
+            log::info!("art: Change art search for {query}: {} found on SteamGridDB", found.len());
+            Ok(found
+                .into_iter()
+                .map(|(id, name)| Candidate {
+                    choice: ArtChoice::SteamGridDb(id),
+                    name,
+                    portrait: sgdb::local(id).portrait,
+                })
+                .collect())
+        }
+        Err(e) => {
+            store.failed("steamgriddb search", &e);
+            Err(Error::Player(match e {
+                ureq::Error::StatusCode(401 | 403) => {
+                    "SteamGridDB didn't accept your key. Give it again in Settings > System.".into()
+                }
+                _ => "SteamGridDB didn't answer. Try again in a moment.".into(),
+            }))
+        }
+    }
+}
+
+/// Downloads the art of SteamGridDB game `id` that isn't on the PC yet, for the player who chose it in Change art.
+pub fn fetch_sgdb(app: &AppHandle, id: u32) -> Result<()> {
+    let mut store = SteamStore::new(app);
+    if !store.online() {
+        return Err(offline());
+    }
+    sgdb::fetch(&mut store, id)
 }
 
 /// Downloads the art of `appid` that isn't on the PC yet, for the player who chose it in Change art. Steam may have
@@ -414,6 +552,11 @@ impl SteamStore {
     }
 
     /// Steam has been reachable so far, and the player still lets Lamplit find art online.
+    /// The HTTP agent, with the store's timeouts, for SteamGridDB (sgdb.rs) too.
+    pub(super) fn agent(&self) -> &ureq::Agent {
+        &self.agent
+    }
+
     pub(super) fn online(&self) -> bool {
         !self.offline && prefs::get(&self.app).online_art
     }
@@ -589,11 +732,20 @@ mod tests {
     fn candidates_reach_the_page_as_in_their_fixture() {
         let found = [
             Candidate {
-                appid: 1_091_500,
+                choice: ArtChoice::Steam(1_091_500),
                 name: "Cyberpunk 2077".into(),
                 portrait: Some(r"C:\Users\player\AppData\Local\lamplit\art\1091500\portrait.jpg".into()),
             },
-            Candidate { appid: 2_138_330, name: "Cyberpunk 2077: Phantom Liberty".into(), portrait: None },
+            Candidate {
+                choice: ArtChoice::Steam(2_138_330),
+                name: "Cyberpunk 2077: Phantom Liberty".into(),
+                portrait: None,
+            },
+            Candidate {
+                choice: ArtChoice::SteamGridDb(5_247_009),
+                name: "Hades II".into(),
+                portrait: Some(r"C:\Users\player\AppData\Local\lamplit\art\sgdb-5247009\portrait.jpg".into()),
+            },
         ];
         assert_eq!(serde_json::to_value(found).unwrap(), ipc_fixture!("art-candidates"));
     }

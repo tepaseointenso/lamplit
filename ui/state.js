@@ -167,6 +167,9 @@ export const state = {
     open: false,
     id: '',
     query: '',
+    /** The tab searched: Steam's store, or SteamGridDB once the player has given a key. */
+    /** @type {import('./api.js').ArtSource} */
+    source: 'steam',
     /** @type {import('./api.js').ArtCandidate[] | null} */
     found: null,
     error: '',
@@ -220,6 +223,8 @@ export const state = {
   quiet: null,
   /** @type {import('./api.js').Startup | null} */
   startup: null,
+  /** A pass is looking for covers, backgrounds and logos, long enough to say so (status.js). */
+  artBusy: false,
   restore: {
     running: false,
     /** @type {import('./api.js').RestoreStep[]} */

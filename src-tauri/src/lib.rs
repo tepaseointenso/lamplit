@@ -166,6 +166,8 @@ pub fn run() {
             commands::prefs_set_steam_devtools,
             commands::prefs_set_steam_guide,
             commands::prefs_set_online_art,
+            commands::steamgriddb_state,
+            commands::library_art_busy,
             commands::prefs_set_screensaver_minutes,
             commands::prefs_set_dock,
             commands::power_sleep,

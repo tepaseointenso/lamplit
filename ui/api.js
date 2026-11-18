@@ -24,7 +24,12 @@ const tauri = /** @type {any} */ (window).__TAURI__;
 
 /**
  * The art the player chose for a game: a Steam app's, or none (the cover shows the name).
- * @typedef {{ steam: number } | 'none'} ArtChoice
+ * @typedef {{ steam: number } | { steamgriddb: number } | 'none'} ArtChoice
+ */
+
+/**
+ * Where Change art searches.
+ * @typedef {'steam' | 'steamgriddb'} ArtSource
  */
 
 /**
@@ -45,9 +50,9 @@ const tauri = /** @type {any} */ (window).__TAURI__;
  */
 
 /**
- * A match on Steam's store for Change art, with its cover when Steam has one.
+ * A match for Change art, on Steam's store or SteamGridDB, with its cover when it has one.
  * @typedef {object} ArtCandidate
- * @property {number} appid
+ * @property {ArtChoice} choice  what to send back when the player picks it
  * @property {string} name
  * @property {string | null} portrait
  */
@@ -306,8 +311,8 @@ export const libraryRescan = () => call('library_rescan');
 export const librarySetFavourite = (id, on) => call('library_set_favourite', { id, on });
 /** @param {string} id @param {boolean} on @returns {Promise<Game[]>} every game, with the change */
 export const librarySetHidden = (id, on) => call('library_set_hidden', { id, on });
-/** What Steam's store has for `query`. @param {string} query @returns {Promise<ArtCandidate[]>} */
-export const libraryArtSearch = (query) => call('library_art_search', { query });
+/** What Steam's store or SteamGridDB has for `query`. @param {string} query @param {ArtSource} source @returns {Promise<ArtCandidate[]>} */
+export const libraryArtSearch = (query, source) => call('library_art_search', { query, source });
 /** @param {string} id @returns {Promise<Capture[]>} newest first, with asset URLs ready to display */
 export const libraryCaptures = (id) => call('library_captures', { id });
 /** @param {string} id @returns {Promise<GameDetails | null>} */
@@ -443,6 +448,14 @@ export const prefsSetSteamDevtools = (on) => call('prefs_set_steam_devtools', { 
 export const prefsSetSteamGuide = (on) => call('prefs_set_steam_guide', { on });
 /** @param {boolean} on @returns {Promise<Prefs>} */
 export const prefsSetOnlineArt = (on) => call('prefs_set_online_art', { on });
+/** @returns {Promise<boolean>} whether a pass is looking for art now */
+export const libraryArtBusy = () => call('library_art_busy');
+/** @returns {Promise<boolean>} whether the player has given a SteamGridDB key */
+export const steamgriddbState = () => call('steamgriddb_state');
+/** Takes the key on the clipboard, once SteamGridDB accepts it. @returns {Promise<boolean>} */
+export const steamgriddbPasteKey = () => call('steamgriddb_paste_key');
+/** @returns {Promise<boolean>} */
+export const steamgriddbRemoveKey = () => call('steamgriddb_remove_key');
 /** @param {number} minutes 0 for never @returns {Promise<Prefs>} */
 export const prefsSetScreensaverMinutes = (minutes) => call('prefs_set_screensaver_minutes', { minutes });
 /** @param {boolean} on @returns {Promise<Prefs>} */
@@ -498,6 +511,8 @@ export const onStores = (handle) => on('stores', handle);
 export const onAccessories = (handle) => on('accessories', handle);
 /** @param {(level: InterfaceSounds) => void} handle */
 export const onInterfaceSounds = (handle) => on('interface-sounds', handle);
+/** A pass looking for art started (true) or ended. @param {(busy: boolean) => void} handle */
+export const onArtBusy = (handle) => on('art-busy', handle);
 /** A short message for the player. @param {(text: string) => void} handle */
 export const onNotice = (handle) => on('notice', handle);
 /** A completed restore step, also returned by restoreChanges. @param {(step: RestoreStep) => void} handle */

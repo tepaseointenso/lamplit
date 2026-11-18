@@ -1,6 +1,6 @@
 // @ts-check
-// The status capsule, top right of the home screen: the controllers' and the headset's batteries, the volume, quiet
-// mode while it is on, and the time, as the chips of the dock's top line. Settings grows down out of it, and it is
+// The status capsule, top right of the home screen: art being looked for, the controllers' and the headset's
+// batteries, the volume, quiet mode while it is on, and the time, as the chips of the dock's top line. Settings grows down out of it, and it is
 // Settings' header while Settings is open (settings.js).
 
 import * as api from './api.js';
@@ -34,10 +34,11 @@ function tickClock() {
 export function renderStatus() {
   const batteries = chips(state.accessories);
   const sound = state.sound;
-  const drawn = JSON.stringify([batteries, sound?.volume, sound?.muted, !!state.quiet?.active]);
+  const drawn = JSON.stringify([batteries, sound?.volume, sound?.muted, !!state.quiet?.active, state.artBusy]);
   if (els.chips.dataset.drawn === drawn) return;
   els.chips.dataset.drawn = drawn;
   els.chips.replaceChildren(
+    ...(state.artBusy ? [Object.assign(span('chip busy', 'Finding art'), { id: 'artBusyChip' })] : []),
     ...batteries.map((c) => {
       const chip = span(`chip ${c.tone}`);
       const battery = span('battery');
@@ -71,8 +72,28 @@ export async function readStatus() {
   renderStatus();
 }
 
+/** How long a pass runs before the capsule says Lamplit is looking for art: a pass with nothing to fetch stays quiet. */
+const BUSY_AFTER_MS = 500;
+let busyTimer = 0;
+
+/** A pass looking for art started or ended. @param {boolean} busy */
+export function setArtBusy(busy) {
+  clearTimeout(busyTimer);
+  if (busy) {
+    busyTimer = setTimeout(() => {
+      state.artBusy = true;
+      renderStatus();
+    }, BUSY_AFTER_MS);
+  } else if (state.artBusy) {
+    state.artBusy = false;
+    renderStatus();
+  }
+}
+
 /** Starts the capsule: the time now and every 5 s, the rest now and every minute while the page shows. */
 export function startStatus() {
+  api.onArtBusy(setArtBusy);
+  api.libraryArtBusy().then(setArtBusy, () => {});
   tickClock();
   setInterval(tickClock, 5000);
   readStatus();

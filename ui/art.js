@@ -1,6 +1,6 @@
 // @ts-check
-// Change art, from a game's menu: Steam's store searched for the game's name, the matches shown as covers to pick
-// from, and no art at all, which shows the game's name; Back to automatic gives the game Lamplit's own match again.
+// Change art, from a game's menu: Steam's store, or SteamGridDB on its own tab once the player has given a key (L1
+// and R1 switch), searched for the game's name, the matches shown as covers to pick from, and no art at all, which shows the game's name; Back to automatic gives the game Lamplit's own match again.
 // The lifted cover (lift.js) shows the art in focus before it is picked. The search can be edited on the names
 // keyboard.
 
@@ -20,10 +20,22 @@ const field = nameField(els.artKeys, els.artQuery, 40);
 /** Searches asked for so far: the answer to an older one, after the player searched again, is dropped. */
 let searches = 0;
 
+/** A candidate's focus id: `app:<appid>` for Steam, `sgdb:<id>` for SteamGridDB. @param {ArtChoice} choice */
+const tileId = (choice) =>
+  typeof choice === 'object' && 'steamgriddb' in choice ? `sgdb:${choice.steamgriddb}` : typeof choice === 'object' ? `app:${choice.steam}` : 'none';
+
+/** The choice behind a focus id. @param {string} id @returns {ArtChoice} */
+const choiceOf = (id) => (id.startsWith('sgdb:') ? { steamgriddb: Number(id.slice(5)) } : { steam: Number(id.slice(4)) });
+
 /** Opens Change art for the game whose menu is open, searching for its name. */
 export function openArt() {
   const g = byId(/** @type {string} */ (state.lifted));
-  state.art = { ...state.art, open: true, id: g.id, query: g.name, found: null, error: '', focus: 'search', editing: false, saving: false };
+  // The status line names SteamGridDB once a key is set; asked again each time, as Settings may have changed it.
+  api.steamgriddbState().then((on) => {
+    state.steamgriddb = on;
+    if (state.art.open) render();
+  }, () => {});
+  state.art = { ...state.art, open: true, id: g.id, query: g.name, source: 'steam', found: null, error: '', focus: 'search', editing: false, saving: false };
   showSheet('art');
   sfx.open();
   search();
@@ -35,16 +47,29 @@ async function search() {
   Object.assign(art, { found: null, error: '' });
   render();
   try {
-    const found = await api.libraryArtSearch(art.query);
+    const found = await api.libraryArtSearch(art.query, art.source);
     if (asked !== searches || !art.open) return;
     art.found = found;
     // Focus goes to the first match, unless the player has moved on meanwhile.
-    if (art.focus === 'search' && found.length) art.focus = `app:${found[0].appid}`;
+    if (art.focus === 'search' && found.length) art.focus = tileId(found[0].choice);
   } catch (e) {
     if (asked !== searches || !art.open) return;
     art.error = e.message;
   }
   render();
+}
+
+/** Where a search looks, as the status line names it. */
+const where = () => (state.art.source === 'steamgriddb' ? 'SteamGridDB' : "Steam's store");
+
+/** The other tab, searching the same words there. */
+function switchSource() {
+  const { art } = state;
+  if (!state.steamgriddb) return sfx.edge();
+  art.source = art.source === 'steam' ? 'steamgriddb' : 'steam';
+  art.focus = 'search';
+  sfx.move();
+  search();
 }
 
 /** @param {string} cls @param {string} text */
@@ -60,26 +85,32 @@ function render() {
   const { art } = state;
   const g = byId(art.id);
   els.artPick.classList.toggle('editing', art.editing);
+  els.artPick.classList.toggle('has-tabs', !!state.steamgriddb);
+  for (const tab of /** @type {NodeListOf<HTMLElement>} */ (els.artPick.querySelectorAll('.art-tab'))) {
+    const on = tab.dataset.source === art.source;
+    tab.classList.toggle('on', on);
+    tab.setAttribute('aria-selected', String(on));
+  }
   // While the player types, the field shows what the keyboard holds, which Done searches for.
   els.artQuery.textContent = art.editing ? field.text : art.query;
   els.artStatus.textContent = art.error
     ? art.error
     : art.found === null
-      ? `Searching Steam's store for "${art.query}"…`
+      ? `Searching ${where()} for "${art.query}"…`
       : art.found.length
         ? ''
-        : `Nothing on Steam's store matches "${art.query}". Edit the search to try other words.`;
+        : `Nothing on ${where()} matches "${art.query}". Edit the search to try other words.`;
   const chosen = g.art_choice;
   els.artTiles.replaceChildren(
     ...(art.found ?? []).map((c) => {
       const look = coverLook(c.name, c.portrait);
       const tile = div(`tile${look.art ? ' has-art' : ''}`);
-      tile.dataset.id = `app:${c.appid}`;
+      tile.dataset.id = tileId(c.choice);
       const cover = div('art');
       cover.style.backgroundImage = look.image;
       // Choosing it leaves the game's cover to its name, as the lifted card shows when it is in focus.
       if (!look.art) cover.append(div('none', 'No cover'));
-      if (typeof chosen === 'object' && chosen?.steam === c.appid) cover.append(div('badge', 'Chosen'));
+      if (chosen && tileId(chosen) === tile.dataset.id) cover.append(div('badge', 'Chosen'));
       tile.append(cover, div('caption', c.name));
       return tile;
     })
@@ -113,7 +144,7 @@ const targets = () =>
 function preview() {
   const { art } = state;
   const g = byId(art.id);
-  const match = !art.editing && art.found?.find((c) => art.focus === `app:${c.appid}`);
+  const match = !art.editing && art.found?.find((c) => art.focus === tileId(c.choice));
   if (match) face(coverLook(g.name, match.portrait));
   else if (!art.editing && art.focus === 'none') face(coverLook(g.name, null));
   else face(coverLook(g.name, g.art.portrait));
@@ -160,7 +191,7 @@ function press() {
   if (id === 'search') return edit();
   if (id === 'none') return choose('none');
   if (id === 'auto') return choose(null);
-  choose({ steam: Number(id.slice('app:'.length)) });
+  choose(choiceOf(id));
 }
 
 /** @param {ArtChoice | null} choice */
@@ -211,13 +242,19 @@ export function actArt(action) {
   if (art.saving) return;
   if (action === 'ok') press();
   else if (action === 'square') edit();
+  else if (action === 'l1' || action === 'r1') switchSource();
   else if (action === 'up' || action === 'down' || action === 'left' || action === 'right') move(action);
 }
 
 clickable(field, () => state.art.open && state.art.editing, () => stopEditing(field.text));
 
-// A click on a cover or a choice picks it; one on the search field edits it.
+// A click on a cover or a choice picks it; one on the search field edits it; one on the other tab switches to it.
 els.artPick.addEventListener('click', (e) => {
+  const tab = /** @type {HTMLElement | null} */ (/** @type {Element} */ (e.target).closest('.art-tab'));
+  if (tab) {
+    if (state.art.open && !state.art.editing && !state.art.saving && tab.dataset.source !== state.art.source) switchSource();
+    return;
+  }
   const target = /** @type {HTMLElement | null} */ (/** @type {Element} */ (e.target).closest('[data-id]'));
   if (!target || !state.art.open || state.art.editing || state.art.saving || els.artKeys.contains(target)) return;
   state.art.focus = /** @type {string} */ (target.dataset.id);

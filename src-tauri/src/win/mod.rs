@@ -4,6 +4,7 @@
 pub mod audio;
 pub mod bluetooth;
 pub mod captures;
+pub mod clipboard;
 mod com;
 pub mod display;
 pub mod dock;
