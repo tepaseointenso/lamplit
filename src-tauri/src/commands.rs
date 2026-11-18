@@ -410,7 +410,21 @@ pub async fn igdb_remove() -> Result<library::IgdbState> {
     blocking(library::igdb_remove).await?
 }
 
+/// The language Lamplit's screens are in: "" for the PC's, "en" or "es" (ui/i18n.js).
+#[tauri::command]
+pub async fn prefs_set_ui_language(app: AppHandle, language: String) -> Result<Prefs> {
+    if !["", "en", "es"].contains(&language.as_str()) {
+        return Err(Error::Player("Lamplit isn't translated into that language yet.".into()));
+    }
+    blocking(move || prefs::change(&app, |p| p.ui_language = language).map(|()| prefs::get(&app))).await?
+}
+
 /// Windows' locale for the player ("es-CL"): the page's language while Settings says Automatic.
+#[tauri::command]
+pub fn system_locale() -> String {
+    win::region::locale()
+}
+
 /// The language of About's descriptions, "" for the PC's. The page reads the prefs again.
 #[tauri::command]
 pub async fn prefs_set_details_language(app: AppHandle, language: String) -> Result<Prefs> {

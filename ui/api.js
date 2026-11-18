@@ -216,6 +216,7 @@ const tauri = /** @type {any} */ (window).__TAURI__;
  * @property {boolean} steam_guide  Lamplit keeps Steam's Guide Button Focuses Steam setting off
  * @property {boolean} online_art  art comes from Steam's store too
  * @property {string} details_language  About's descriptions, '' for the PC's language
+ * @property {string} ui_language  Lamplit's own screens (i18n.js), '' for the PC's language
  * @property {number} screensaver_minutes  minutes without input before the screensaver, 0 for never
  * @property {boolean} dock  holding PS over a game opens the dock rather than the home screen
  * @property {boolean} check_updates  checks GitHub automatically at most once a day after start
@@ -463,7 +464,9 @@ export const igdbPasteSecret = () => call('igdb_paste_secret');
 /** @returns {Promise<IgdbState>} */
 export const igdbRemove = () => call('igdb_remove');
 /** @param {string} language '', 'en' or 'es' @returns {Promise<Prefs>} */
+export const prefsSetUiLanguage = (language) => call('prefs_set_ui_language', { language });
 /** @returns {Promise<string>} Windows' locale for the player: 'es-CL' */
+export const systemLocale = () => call('system_locale');
 /** @param {string} language '' for the PC's @returns {Promise<Prefs>} */
 export const prefsSetDetailsLanguage = (language) => call('prefs_set_details_language', { language });
 /** @param {string} id @param {string | null} platform null: Lamplit's own reading @returns {Promise<Game[]>} */

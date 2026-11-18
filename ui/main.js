@@ -5,6 +5,7 @@ import * as api from './api.js';
 import { finishHint, setPadKind, toast } from './hints.js';
 import { meter } from './frames.js';
 import { act } from './input.js';
+import { applyLanguage } from './i18n.js';
 import { mountIcons } from './icons.js';
 import { onPlay, onStep, onSummoned } from './launch.js';
 import { layout, onArt, setGames } from './library.js';
@@ -90,6 +91,8 @@ window.addEventListener('error', (e) => api.log.error(`${e.message} at ${e.filen
 window.addEventListener('unhandledrejection', (e) => api.log.error(`unhandled: ${e.reason?.message ?? e.reason}`));
 
 async function init() {
+  // Before the first screen draws, so it doesn't show in English first.
+  await applyLanguage();
   startStatus();
   let heardGames = false;
   let heardKind = false;

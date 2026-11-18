@@ -110,6 +110,7 @@ const fakeTauri = ({ games, running = null, launchError = null, earlyGames = nul
     steamgriddb_state: false,
     library_art_busy: false,
     igdb_state: 'none',
+    system_locale: 'en-US',
     startup_set: ({ on }) => ({ enabled: on }),
     restore_changes: [],
   };

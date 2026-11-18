@@ -173,6 +173,8 @@ pub fn run() {
             commands::igdb_paste_secret,
             commands::igdb_remove,
             commands::prefs_set_details_language,
+            commands::prefs_set_ui_language,
+            commands::system_locale,
             commands::library_set_platform,
             commands::steamgriddb_paste_key,
             commands::steamgriddb_remove_key,

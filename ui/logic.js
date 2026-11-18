@@ -590,7 +590,19 @@ export function stepPlatform(now, dir) {
   return all[(at + dir + all.length) % all.length];
 }
 
+/** The languages Lamplit's own screens come in (i18n.js): code and name, Automatic ('') first. */
+export const UI_LANGUAGES = /** @type {[string, string][]} */ ([
+  ['', 'Automatic (this PC)'],
+  ['en', 'English'],
+  ['es', 'Español'],
+]);
+
 /** The next screen language that way, staying at either end. @param {string} now @param {number} dir */
+export function stepUiLanguage(now, dir) {
+  const codes = UI_LANGUAGES.map(([c]) => c);
+  return codes[Math.max(0, Math.min(codes.length - 1, Math.max(0, codes.indexOf(now)) + dir))];
+}
+
 /** About's languages: code and name, Automatic ('') first. Steam has each; IGDB has English only. */
 export const DETAILS_LANGUAGES = /** @type {[string, string][]} */ ([
   ['', 'Automatic (this PC)'], ['en', 'English'], ['es', 'Español (España)'], ['es-419', 'Español (Latinoamérica)'],
@@ -871,6 +883,8 @@ export function sectionRows(key, state) {
     rows.push({ kind: 'startup', label: 'Start when I sign in', value: state.startup ? onOff(state.startup.enabled) : 'Unknown', note: 'Older installations may ask for admin rights when switched off.' });
     rows.push({ kind: 'setup', label: "Repair Steam's background service", note: 'Stops Steam asking for admin rights.', value: '' });
     rows.push({ kind: 'onlineart', label: "Find art online (sends game names to Steam's store)", value: onOff(prefs?.online_art) });
+    const uiLanguage = UI_LANGUAGES.find(([c]) => c === (prefs?.ui_language ?? ''))?.[1] ?? 'Automatic (this PC)';
+    rows.push({ kind: 'uilang', adjust: true, label: 'Lamplit language', value: uiLanguage });
     const language = DETAILS_LANGUAGES.find(([c]) => c === (prefs?.details_language ?? ''))?.[1] ?? 'Automatic (this PC)';
     rows.push({ kind: 'detailslang', adjust: true, label: "Language of game descriptions (Steam's; IGDB's are in English)", value: language });
     if (state.igdb === 'ready') {

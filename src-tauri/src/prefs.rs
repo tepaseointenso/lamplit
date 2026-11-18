@@ -170,6 +170,8 @@ pub struct Prefs {
     pub online_art: bool,
     /// The language of About's descriptions (library/lang.rs), "" for the PC's.
     pub details_language: String,
+    /// The language Lamplit's own screens are in (ui/i18n.js), "" for the PC's.
+    pub ui_language: String,
     /// Minutes without input before the page shows its screensaver, 0 for never (ui/screensaver). Prefs written while
     /// the screensaver still had a 2D and 3D choice also hold a `screensaver_style`, which serde passes over.
     pub screensaver_minutes: u32,
@@ -196,6 +198,7 @@ impl Default for Prefs {
             steam_guide: true,
             online_art: true,
             details_language: String::new(),
+            ui_language: String::new(),
             screensaver_minutes: 5,
             dock: true,
             check_updates: true,

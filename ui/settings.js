@@ -8,8 +8,9 @@ import { morph, turn } from './morph.js';
 import * as api from './api.js';
 import { showHints, toast } from './hints.js';
 import { hold, letGo } from './hold.js';
-import { SAVER_DEFAULT, SECTIONS, focusIndex, quietMode, rowKey, sectionRows, sectionSummary, stepAutoOff, stepDetailsLanguage, stepEdgeTarget, stepInterfaceSounds, stepSaverMinutes, stepTrailers, visibleSections } from './logic.js';
+import { applyLanguage } from './i18n.js';
 import { forgetBlurbs, glyph, labelled, setGames, showInfo } from './library.js';
+import { SAVER_DEFAULT, SECTIONS, focusIndex, quietMode, rowKey, sectionRows, sectionSummary, stepAutoOff, stepDetailsLanguage, stepEdgeTarget, stepUiLanguage, stepInterfaceSounds, stepSaverMinutes, stepTrailers, visibleSections } from './logic.js';
 import { showScreensaver, warmScreensaver } from './screensaver/index.js';
 import { setSoundLevel, sfx } from './sounds.js';
 import { SPRINGS } from './springs.js';
@@ -332,6 +333,7 @@ export async function adjustSetting(dir) {
     else if (row.kind === 'interfacesounds') await adjustInterfaceSounds(dir);
     else if (row.kind === 'trailers') await adjustTrailers(dir);
     else if (row.kind === 'detailslang') await adjustDetailsLanguage(dir);
+    else if (row.kind === 'uilang') await adjustUiLanguage(dir);
     else if (row.kind === 'edgebutton') await adjustEdgeButton(/** @type {import('./api.js').EdgeButton} */ (row.key), dir);
     else await adjustHeadset(row.kind, dir);
   } catch (e) {
@@ -377,7 +379,22 @@ async function adjustTrailers(dir) {
   }
 }
 
+let uiLanguageBusy = false;
+
 /** A held direction steps from the last saved language; the page changes language at once. @param {number} dir */
+async function adjustUiLanguage(dir) {
+  if (uiLanguageBusy || !state.prefs) return;
+  const next = stepUiLanguage(state.prefs.ui_language ?? '', dir);
+  if (next === (state.prefs.ui_language ?? '')) return;
+  uiLanguageBusy = true;
+  try {
+    state.prefs = await api.prefsSetUiLanguage(next);
+    await applyLanguage(next);
+  } finally {
+    uiLanguageBusy = false;
+  }
+}
+
 let languageBusy = false;
 
 /** A held direction steps from the last saved language. @param {number} dir */
@@ -442,7 +459,7 @@ async function adjustScreensaver(dir) {
 }
 
 /** The rows that switch one of the player's prefs. */
-const PREF_ROWS = ['follows', 'touchmouse', 'steamport', 'steamguide', 'onlineart', 'dock', 'saverafter', 'checkupdates'];
+const PREF_ROWS = ['follows', 'touchmouse', 'steamport', 'steamguide', 'onlineart', 'dock', 'saverafter', 'checkupdates', 'detailslang', 'uilang'];
 let updateBusy = false;
 
 async function chooseUpdate() {

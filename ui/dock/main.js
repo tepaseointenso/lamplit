@@ -7,6 +7,7 @@ import * as api from '../api.js';
 import { accentOf, buttonFace, counts, nothingSeen, quietMode } from '../logic.js';
 import { meter } from '../frames.js';
 import { hold, holdRing } from '../hold.js';
+import { applyLanguage } from '../i18n.js';
 import { mountIcons } from '../icons.js';
 import { fillPill } from '../pill.js';
 import { focusRing } from '../ring.js';
@@ -345,6 +346,7 @@ function showNews(news) {
 /** @param {import('../api.js').DockShow} show */
 function onDock(show) {
   // Settings may have changed the language since the dock last opened.
+  if (show.mode === 'open') applyLanguage();
   if (show.mode === 'open') open();
   else if (show.mode === 'closed') fold();
   else showNews(show);
@@ -957,6 +959,7 @@ window.addEventListener('error', (e) => api.log.error(`dock: ${e.message} at ${e
 window.addEventListener('unhandledrejection', (e) => api.log.error(`dock: unhandled: ${e.reason?.message ?? e.reason}`));
 
 async function init() {
+  await applyLanguage();
   measure();
   // The island opens on the lift spring and folds on the close one; the focus ring, the volume and a focused tile move
   // on the snap (springs.js).
