@@ -545,7 +545,10 @@ export async function selectSetting() {
       state.startup = await api.startupSet(!state.startup?.enabled);
     } else if (row.kind === 'onlineart') {
       state.prefs = await api.prefsSetOnlineArt(!state.prefs?.online_art);
+    } else if (row.kind === 'findmissing') {
+      await api.libraryFindMissing();
       forgetBlurbs();
+      toast('Searching for missing details and art. Lamplit says when it is done.');
     } else if (row.kind === 'igdbid') {
       state.igdb = await api.igdbPasteClientId();
       toast('Client ID saved. Now copy the Client Secret and paste it on the next row.');

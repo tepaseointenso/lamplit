@@ -171,6 +171,13 @@ pub(super) fn details_appid(g: &Game) -> Option<u32> {
     g.steam_appid.or_else(|| load().lookups.get(&g.id).and_then(|l| l.appid))
 }
 
+/// Forgets the games no SteamGridDB game matched by name, so the next pass searches them again at once.
+pub fn forget_grid_misses() {
+    let mut db = load();
+    db.grid.retain(|_, l| l.appid.is_some());
+    save(&db);
+}
+
 /// Whether a pass of `fetch_missing` is running, for a page that loads in the middle of one.
 static BUSY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 

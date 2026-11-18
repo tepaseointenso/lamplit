@@ -113,6 +113,15 @@ pub fn set_secret(store: &SteamStore, text: &str) -> Result<()> {
     Ok(())
 }
 
+/// Forgets the games no IGDB game matched, so they are searched again at once.
+pub fn forget_misses() {
+    let mut s = load();
+    s.matches.retain(|_, m| m.id.is_some());
+    if let Err(e) = save(&s) {
+        log::warn!("igdb: can't save: {e}");
+    }
+}
+
 pub fn remove() -> Result<()> {
     save(&Saved { matches: load().matches, ..Saved::default() })?;
     log::info!("igdb: credentials removed");
@@ -197,7 +206,7 @@ fn match_game(store: &mut SteamStore, auth: &(String, String), key: &str, name: 
         return m.id;
     }
     let mut found = None;
-    for q in name_match::queries(name) {
+    for q in name_match::loose_queries(name) {
         let body = format!("search {}; fields name; where version_parent = null; limit 20;", quoted(&q));
         let items = match query(store, auth, "games", &body) {
             Ok(v) => parse_names(&v),
@@ -209,7 +218,7 @@ fn match_game(store: &mut SteamStore, auth: &(String, String), key: &str, name: 
         // name_match works on u32 ids, which IGDB's still are.
         let short: Vec<(u32, String)> =
             items.iter().filter_map(|(id, n)| Some((u32::try_from(*id).ok()?, n.clone()))).collect();
-        if let Some(id) = name_match::best_match(name, &short) {
+        if let Some(id) = name_match::loose_match(name, &short) {
             found = Some(u64::from(id));
             break;
         }

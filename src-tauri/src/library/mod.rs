@@ -340,6 +340,35 @@ pub fn set_online_art(app: &AppHandle, on: bool) -> Result<()> {
 
 /// Searches again, at once, for every game that has no details or art: IGDB and SteamGridDB forget the names that
 /// matched nothing before, About's details are looked up for each game whatever its platform, and a scan fetches the
+/// art. The page shows the art indicator meanwhile, and a notice says how many games have details at the end.
+pub fn find_missing(app: &AppHandle) {
+    static RUNNING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    if RUNNING.swap(true, std::sync::atomic::Ordering::SeqCst) {
+        return;
+    }
+    let app = app.clone();
+    std::thread::spawn(move || {
+        events::emit(&app, Event::ArtBusy(true));
+        igdb::forget_misses();
+        details::forget_igdb_misses();
+        art::forget_grid_misses();
+        let games = all(&app);
+        let mut found = 0;
+        for g in &games {
+            match details::get(&app, &g.id) {
+                Ok(Some(_)) => found += 1,
+                Ok(None) => log::info!("{}: no details found", g.id),
+                Err(e) => log::warn!("{}: details failed: {e}", g.id),
+            }
+        }
+        log::info!("missing details: {found} of {} games have details", games.len());
+        scan(&app);
+        events::emit(&app, Event::ArtBusy(false));
+        events::emit(&app, Event::Notice(format!("Details found for {found} of {} games.", games.len())));
+        RUNNING.store(false, std::sync::atomic::Ordering::SeqCst);
+    });
+}
+
 /// What Settings shows of the player's IGDB credentials.
 pub fn igdb_state() -> igdb::State {
     igdb::state()

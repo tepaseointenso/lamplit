@@ -20,6 +20,15 @@ const MOST: usize = 12;
 #[serde(default)]
 struct Saved {
     key: String,
+    /// SteamGridDB game → its name and Steam app, as SteamGridDB said (games.rs reads About through them).
+    games: std::collections::HashMap<u32, GameInfo>,
+}
+
+/// A SteamGridDB game's name, and the Steam app it is, if it is one.
+#[derive(Clone, Serialize, Deserialize)]
+pub struct GameInfo {
+    pub name: String,
+    pub steam: Option<u32>,
 }
 
 /// The player's API key, when they gave one.
@@ -63,6 +72,42 @@ pub fn remove_key() -> Result<()> {
     Ok(())
 }
 
+/// What SteamGridDB game `id` is: asked once, then remembered. None without a key, or when SteamGridDB didn't say.
+pub fn game_info(store: &mut SteamStore, id: u32) -> Option<GameInfo> {
+    let mut saved: Saved = data::load_or_default(FILE);
+    if let Some(info) = saved.games.get(&id) {
+        return Some(info.clone());
+    }
+    let key = key()?;
+    let body = match get(store, &key, &format!("{API}/games/id/{id}?platformdata=steam")) {
+        Ok(body) => body,
+        Err(e) => {
+            store.failed(&format!("steamgriddb game {id}"), &e);
+            return None;
+        }
+    };
+    let info = parse_game(&body)?;
+    log::info!("steamgriddb: game {id} is {} (Steam app {:?})", info.name, info.steam);
+    saved.games.insert(id, info.clone());
+    if let Err(e) = data::save(FILE, &saved) {
+        log::warn!("steamgriddb: can't save game {id}: {e}");
+    }
+    Some(info)
+}
+
+/// A game answer: its name, and the first Steam app SteamGridDB links it to.
+fn parse_game(body: &serde_json::Value) -> Option<GameInfo> {
+    let data = &body["data"];
+    let name = data["name"].as_str()?.to_string();
+    let steam = data["external_platform_data"]["steam"].as_array().into_iter().flatten().find_map(|s| {
+        s["id"]
+            .as_str()
+            .and_then(|id| id.parse().ok())
+            .or_else(|| s["id"].as_u64().and_then(|id| u32::try_from(id).ok()))
+    });
+    Some(GameInfo { name, steam })
+}
+
 /// A key is 32 hexadecimal characters.
 fn looks_like_key(key: &str) -> bool {
     key.len() == 32 && key.chars().all(|c| c.is_ascii_hexdigit())
@@ -100,8 +145,8 @@ fn games(store: &SteamStore, key: &str, term: &str) -> std::result::Result<Vec<(
 /// The SteamGridDB game that is `name`, as Steam's store search is matched (name_match.rs): Ok(None) when nothing
 /// is close enough.
 pub fn best_match(store: &SteamStore, key: &str, name: &str) -> std::result::Result<Option<u32>, ureq::Error> {
-    for q in super::name_match::queries(name) {
-        if let Some(id) = super::name_match::best_match(name, &games(store, key, &q)?) {
+    for q in super::name_match::loose_queries(name) {
+        if let Some(id) = super::name_match::loose_match(name, &games(store, key, &q)?) {
             return Ok(Some(id));
         }
     }
@@ -251,6 +296,17 @@ fn path_part(s: &str) -> String {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn a_game_names_itself_and_its_steam_app() {
+        let body = json!({ "data": { "id": 1352, "name": "Grand Theft Auto: San Andreas",
+            "external_platform_data": { "steam": [{ "id": "12120" }] } } });
+        let info = parse_game(&body).unwrap();
+        assert_eq!((info.name.as_str(), info.steam), ("Grand Theft Auto: San Andreas", Some(12_120)));
+        let info = parse_game(&json!({ "data": { "name": "Mouse P.I. for Hire" } })).unwrap();
+        assert_eq!(info.steam, None);
+        assert!(parse_game(&json!({ "success": false })).is_none());
+    }
 
     #[test]
     fn keys_are_32_hex_characters() {

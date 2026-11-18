@@ -3,7 +3,7 @@
 // replaces images with asset URLs after downloading them under art, whose scope already lets the page read them.
 
 use super::art::{SteamStore, details_appid, unreached};
-use super::{Library, igdb, lang};
+use super::{ArtChoice, Library, igdb, lang, sgdb};
 use crate::data;
 use crate::error::{Error, Result};
 use crate::files::{nonempty, write_atomic};
@@ -69,7 +69,16 @@ pub fn get(app: &AppHandle, id: &str) -> Result<Option<Details>> {
     }
     let Some(game) = app.state::<Library>().game(id) else { return Ok(None) };
     let mut store = SteamStore::new(app);
-    let steam = match details_appid(&game) {
+    // Art chosen on SteamGridDB says which game this is: its Steam app, or its name for IGDB.
+    let grid = match game.art_choice {
+        Some(ArtChoice::SteamGridDb(grid)) => sgdb::game_info(&mut store, grid).map(|info| (grid, info)),
+        _ => None,
+    };
+    let appid = match &grid {
+        Some((_, info)) => info.steam,
+        None => details_appid(&game),
+    };
+    let steam = match appid {
         Some(appid) => {
             let fetching = FETCHING.lock().entry(appid).or_default().clone();
             let _fetch = fetching.lock();
@@ -78,13 +87,31 @@ pub fn get(app: &AppHandle, id: &str) -> Result<Option<Details>> {
         None => Ok(None),
     };
     // A game Steam's store doesn't have, or has no details for: IGDB, when the player gave it credentials.
-    let (key, name) = (game.id.clone(), game.name.clone());
+    let (key, name) = match &grid {
+        Some((grid, info)) => (format!("{}#sgdb{grid}", game.id), info.name.clone()),
+        None => (game.id.clone(), game.name.clone()),
+    };
     let result = match steam {
         Ok(None) => from_igdb(app, &key, &name, &mut store),
         other => other,
     };
     // A setting changed during an HTTP request takes effect before anything reaches the page.
     if prefs::get(app).online_art { result } else { Ok(None) }
+}
+
+/// Forgets the IGDB lookups that found nothing, so About asks again at once rather than after FRESH_SECS.
+pub fn forget_igdb_misses() {
+    let Ok(dir) = std::fs::read_dir(data::data_dir().join("details")) else { return };
+    for entry in dir.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if !name.starts_with("igdb-") || !name.ends_with(".json") {
+            continue;
+        }
+        let cached: Option<Cache> = data::load(&format!("details/{name}")).ok().flatten();
+        if cached.is_some_and(|c| c.details.is_none()) {
+            let _ = std::fs::remove_file(entry.path());
+        }
+    }
 }
 
 /// IGDB's details of the game called `name` (`key`: whose they are, for the caches), cached like Steam's, with the

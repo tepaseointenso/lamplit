@@ -465,6 +465,8 @@ export const igdbPasteSecret = () => call('igdb_paste_secret');
 export const igdbRemove = () => call('igdb_remove');
 /** @param {string} language '', 'en' or 'es' @returns {Promise<Prefs>} */
 export const prefsSetUiLanguage = (language) => call('prefs_set_ui_language', { language });
+/** Searches again for every game without details or art; a notice says how it went. @returns {Promise<void>} */
+export const libraryFindMissing = () => call('library_find_missing');
 /** @returns {Promise<string>} Windows' locale for the player: 'es-CL' */
 export const systemLocale = () => call('system_locale');
 /** @param {string} language '' for the PC's @returns {Promise<Prefs>} */

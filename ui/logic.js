@@ -887,6 +887,7 @@ export function sectionRows(key, state) {
     rows.push({ kind: 'uilang', adjust: true, label: 'Lamplit language', value: uiLanguage });
     const language = DETAILS_LANGUAGES.find(([c]) => c === (prefs?.details_language ?? ''))?.[1] ?? 'Automatic (this PC)';
     rows.push({ kind: 'detailslang', adjust: true, label: "Language of game descriptions (Steam's; IGDB's are in English)", value: language });
+    rows.push({ kind: 'findmissing', label: 'Find missing details and art', value: 'Search now', note: 'Searches Steam, IGDB and SteamGridDB again for every game without them, whatever its platform.' });
     if (state.igdb === 'ready') {
       rows.push({ kind: 'igdbremove', label: 'IGDB (details of games Steam doesn\'t have)', value: 'Remove', tone: 'good', note: 'About uses IGDB for emulated games and recompilations.' });
     } else if (state.igdb === 'id') {

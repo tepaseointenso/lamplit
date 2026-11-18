@@ -175,6 +175,7 @@ pub fn run() {
             commands::prefs_set_details_language,
             commands::prefs_set_ui_language,
             commands::system_locale,
+            commands::library_find_missing,
             commands::library_set_platform,
             commands::steamgriddb_paste_key,
             commands::steamgriddb_remove_key,

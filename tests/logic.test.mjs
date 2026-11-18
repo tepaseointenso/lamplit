@@ -655,7 +655,7 @@ describe('Sound and System summaries', () => {
   });
   test('System keeps startup, Steam repair, Save a report and a held restore available', () => {
     const rows = sectionRows('system', settingsState({ prefs: prefs({ online_art: true }) }));
-    assert.deepEqual(rows.map((r) => r.kind), ['startup', 'setup', 'onlineart', undefined, 'report', 'restore']);
+    assert.deepEqual(rows.map((r) => r.kind), ['startup', 'setup', 'onlineart', 'uilang', 'detailslang', 'findmissing', 'igdbid', 'sgdbpaste', undefined, 'report', 'restore']);
     assert.equal(rows.find((r) => r.kind === 'report').label, 'Save a report');
     assert.equal(rows[0].value, 'Unknown');
     assert.match(rows[0].note, /Older installations/);

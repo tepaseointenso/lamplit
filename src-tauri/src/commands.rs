@@ -388,6 +388,12 @@ pub async fn prefs_set_online_art(app: AppHandle, on: bool) -> Result<Prefs> {
 }
 
 /// Searches IGDB, Steam and SteamGridDB again for every game without details or art; returns at once, and a notice
+/// says how it went.
+#[tauri::command]
+pub fn library_find_missing(app: AppHandle) {
+    library::find_missing(&app);
+}
+
 /// What Settings shows of the IGDB credentials: none, the Client ID only, or both.
 #[tauri::command]
 pub async fn igdb_state() -> Result<library::IgdbState> {
