@@ -81,6 +81,9 @@ export async function probeTests({ open, close, check, games }) {
     // What the page drew of its own before the first press is no interaction of the test's: on a slow machine the
     // logo can load after the probe has come on, an update-logo run (probe.js watch).
     while (runs[0]?.[2].startsWith('update-')) runs.shift();
+    // The focused game's description comes in once focus has rested on it (library.js showBlurb), whenever Rust
+    // answers: an update of the page's own, not one of the test's presses.
+    for (let i = runs.length - 1; i >= 0; i--) if (runs[i][2] === 'update-blurb') runs.splice(i, 1);
     check(
       'each interaction logs one line with its frames, named from the press and the screen',
       JSON.stringify(runs.map((m) => m[2])) === JSON.stringify(['row-step', 'row-step', 'lift-open', 'lift-close', 'find-open', 'find-type', 'arrive']) &&

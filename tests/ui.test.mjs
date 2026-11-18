@@ -2288,7 +2288,7 @@ for (const vp of [{ width: 1920, height: 1080 }, { width: 3840, height: 2160 }, 
   await page.keyboard.press('Escape');
   const choices = await page.evaluate(() => [...document.querySelectorAll('#dChoices .row')].map((r) => r.textContent));
   check('the menu of a game added by hand offers Remove from Lamplit, saying the files stay', choices.at(-1) === 'Remove from LamplitLamplit forgets it. The files stay.' && (await page.evaluate(() => document.getElementById('dStore').textContent)) === 'Added by hand', JSON.stringify(choices));
-  for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowDown');
+  for (let i = 0; i < 6; i++) await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
   s = await state(page);
   check('✕ pressed on Remove removes nothing', s.lastCall?.[0] !== 'library_remove_game' && s.hint.includes('Hold to remove'), `${JSON.stringify(s.lastCall)} ${s.hint}`);
@@ -2881,7 +2881,7 @@ for (const viewport of [{ width: 1920, height: 1080 }, { width: 3840, height: 21
       [sheet, rows]
     );
   await page.keyboard.press('i');
-  for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowDown');
+  for (let i = 0; i < 6; i++) await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
   await settled(page);
   let f = await fit('details', '#dChoices .row');
@@ -2889,7 +2889,7 @@ for (const viewport of [{ width: 1920, height: 1080 }, { width: 3840, height: 21
   check(`${at}: every choice of the fullest game menu is inside its panel, clear of the hints`, f.inside && f.clear, JSON.stringify(f));
   check(`${at}: the folder takes at most two lines, its own name on the second`, f.lines <= 2 && f.own === folder, JSON.stringify(f));
   await page.screenshot({ path: path.join(shots, `menu-fullest-${viewport.width}.png`) });
-  for (let i = 0; i < 2; i++) await page.keyboard.press('ArrowUp');
+  for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowUp');
   await page.keyboard.press('Enter');
   await idle(page);
   await page.keyboard.press('f');
@@ -2899,7 +2899,7 @@ for (const viewport of [{ width: 1920, height: 1080 }, { width: 3840, height: 21
   await close(page);
 }
 
-// Every choice at once (a running game added by hand, with captures, under a three-line name) is taller than the
+// Every choice at once (a running game added by hand, with captures and a platform, under a three-line name) is taller than the
 // plate on a 1080p screen: the choices scroll, and the focused one stays inside the plate, clear of the hints.
 for (const viewport of [{ width: 1920, height: 1080 }, { width: 3840, height: 2160 }]) {
   const g = game(1, { name: 'Tomb Raider: Definitive Edition Game of the Year Collectors Bundle', manual: true });
@@ -2909,7 +2909,7 @@ for (const viewport of [{ width: 1920, height: 1080 }, { width: 3840, height: 21
     ipc('captures'),
   ]);
   await emit(page, 'pad', 'menu');
-  await until(page, () => document.querySelectorAll('#dChoices .row').length === 8);
+  await until(page, () => document.querySelectorAll('#dChoices .row').length === 9);
   const seen = async () => page.evaluate(() => {
     const box = (el) => el.getBoundingClientRect();
     const plate = box(document.getElementById('details'));
@@ -2923,13 +2923,13 @@ for (const viewport of [{ width: 1920, height: 1080 }, { width: 3840, height: 21
       clear: plate.bottom <= box(document.getElementById('hint')).top,
     };
   });
-  for (let i = 0; i < 7; i++) await emit(page, 'pad', 'down');
+  for (let i = 0; i < 8; i++) await emit(page, 'pad', 'down');
   await settled(page);
   const last = await seen();
   const at = `${viewport.width}x${viewport.height}`;
-  check(`${at}: the last of eight choices scrolls into the plate, clear of the hints, with the whole folder line`, last.rows === 8 && last.focus.startsWith('Remove from Lamplit') && last.inside && last.clear && last.folder, JSON.stringify(last));
-  await page.screenshot({ path: path.join(shots, `menu-eight-${viewport.width}.png`) });
-  for (let i = 0; i < 7; i++) await emit(page, 'pad', 'up');
+  check(`${at}: the last of nine choices scrolls into the plate, clear of the hints, with the whole folder line`, last.rows === 9 && last.focus.startsWith('Remove from Lamplit') && last.inside && last.clear && last.folder, JSON.stringify(last));
+  await page.screenshot({ path: path.join(shots, `menu-nine-${viewport.width}.png`) });
+  for (let i = 0; i < 8; i++) await emit(page, 'pad', 'up');
   const first = await seen();
   check(`${at}: Back to game scrolls back into the plate`, first.focus === 'Back to game' && first.inside, JSON.stringify(first));
   await close(page);
@@ -3053,12 +3053,14 @@ for (const viewport of [{ width: 1920, height: 1080 }, { width: 3840, height: 21
   };
   const page = await open({ games: [game(1), game(2), game(3)], init: watch });
   await until(page, () => window.__made.includes('audio'));
-  const ahead = await page.evaluate(() => [...window.__made]);
+  // The focused game's logo is measured to size it (library.js sizeLogo); only hero art drawn for a colour counts.
+  const logo = await page.evaluate(() => { const l = document.getElementById('logo'); return `drawn ${l.naturalWidth}x${l.naturalHeight}`; });
+  const ahead = await page.evaluate((logo) => window.__made.filter((m) => m !== logo), logo);
   check('the audio device starts after start, before the first press', JSON.stringify(ahead) === '["audio"]', JSON.stringify(ahead));
   // The next game's colour, worked out from its hero.
   await page.keyboard.press('ArrowRight');
   await page.waitForTimeout(500);
-  const made = await page.evaluate(() => [...window.__made]);
+  const made = await page.evaluate((logo) => window.__made.filter((m) => m !== logo), logo);
   check('the first sound starts no audio device, and no hero is drawn for its colour', JSON.stringify(made) === '["audio"]', JSON.stringify(made));
   const drift = () => page.evaluate(() => [...document.querySelectorAll('.hero')].map((h) => getComputedStyle(h).animationPlayState).join(' '));
   // Once the plate has grown or gone back: the drift holds only while it morphs (53).
@@ -3573,7 +3575,9 @@ for (const [viewport, scale] of [[{ width: 1920, height: 1080 }, 1], [{ width: 2
       const atA = box();
       r.move(b);
       const way = [];
-      for (let i = 0; i < 45; i++) {
+      // By time, not by frames: 45 frames are 750 ms at 60 Hz but under 200 ms on a 240 Hz screen.
+      const from = performance.now();
+      while (performance.now() - from < 750) {
         await frame();
         way.push(box());
       }
@@ -3696,7 +3700,7 @@ for (const [viewport, scale] of [[{ width: 1920, height: 1080 }, 1], [{ width: 2
   });
   check('one plate holds the menu, Change art, Your captures and About', menu.plates === 'sheet,details,artPick,capturesFace,about', menu.plates);
   check('... one line under the name, the folder dim at the bottom', /^[^·]+ · Played yesterday · 31 h$/.test(menu.line) && menu.folderBelow && menu.folderDim, JSON.stringify(menu));
-  check('... Play lit and focused first, every row with its icon from the shared set', menu.first && menu.lit && menu.shared && menu.icons === '#i-play,#i-info,#i-star,#i-photo,#i-eye-off', JSON.stringify(menu));
+  check('... Play lit and focused first, every row with its icon from the shared set', menu.first && menu.lit && menu.shared && menu.icons === '#i-play,#i-info,#i-star,#i-photo,#i-controller,#i-eye-off', JSON.stringify(menu));
   await page.evaluate((list) => {
     window.__settings.library_set_favourite = ({ id, on }) => list.map((g) => (g.id === id ? { ...g, favourite: on } : g));
   }, await page.evaluate(() => window.__state?.games ?? null) ?? [game(1, { last_played: 0 }), game(2), game(3)]);
@@ -3786,7 +3790,7 @@ for (const [viewport, scale] of [[{ width: 1920, height: 1080 }, 1], [{ width: 2
     JSON.stringify(m.rows.at(-1)) === JSON.stringify(['Close game', 'Closes Game 001', '#i-close-game', true]) && m.rows.filter((r) => r[3]).length === 1,
     JSON.stringify(m.rows)
   );
-  for (let i = 0; i < 5; i++) await emit(page, 'pad', 'down');
+  for (let i = 0; i < 6; i++) await emit(page, 'pad', 'down');
   m = await menu();
   check('... its hint says to hold', m.focus === 'Close game' && m.hint.includes('Hold to close game'), m.hint);
   const before = m.calls.length;
@@ -4323,7 +4327,8 @@ for (const [viewport, scale] of [[{ width: 1920, height: 1080 }, 1], [{ width: 2
   const removeRow = async () => {
     await emit(page, 'pad', 'menu');
     await settled(page);
-    for (let i = 0; i < 5; i++) await emit(page, 'pad', 'down');
+    // Play, About, Favourite, Change art, Platform, Hide, then Remove.
+    for (let i = 0; i < 6; i++) await emit(page, 'pad', 'down');
     await settled(page);
   };
   const focusName = () => page.evaluate(() => document.querySelector('.cover.focus .name')?.textContent);
@@ -5127,13 +5132,14 @@ for (const dismiss of ['ok', 'back']) {
     window.__settings = { library_captures: () => new Promise((resolve) => { window.__capturesReady = resolve; }) };
   });
   await emit(page, 'pad', 'menu');
-  check('the menu opens before captures have answered', (await state(page)).details && await page.locator('#dChoices .row').count() === 5);
-  for (let i = 0; i < 4; i++) await emit(page, 'pad', 'down');
+  check('the menu opens before captures have answered', (await state(page)).details && await page.locator('#dChoices .row').count() === 6);
+  for (let i = 0; i < 5; i++) await emit(page, 'pad', 'down');
   await page.evaluate((items) => window.__capturesReady(items), captures);
   await idle(page);
   check('Your captures appears after Change art without moving focus off Hide',
-    (await page.locator('#dChoices .row').allTextContents()).join('|') === 'Play|About this game|Favourite|Change art|Your captures|Hide this game' &&
+    (await page.locator('#dChoices .row').allTextContents()).join('|') === 'Play|About this game|Favourite|Change art|Your captures|Platform: Automatic← → to change|Hide this game' &&
     await page.locator('#dChoices .row.focus').textContent() === 'Hide this game');
+  await emit(page, 'pad', 'up');
   await emit(page, 'pad', 'up');
   await emit(page, 'pad', 'ok');
   await settled(page);
@@ -5180,6 +5186,106 @@ for (const dismiss of ['ok', 'back']) {
   await page.evaluate((items) => window.__capturesReady(items), ipc('captures'));
   await idle(page);
   check('a late captures reply cannot add another game\'s captures', !(await page.locator('#dChoices').textContent()).includes('Your captures'));
+  await close(page);
+}
+
+// Settings > System for About's details: IGDB's Client ID and Secret pasted in turn and removed again, the
+// descriptions' language stepped, and every game searched again for what it lacks.
+{
+  const page = await open({ games: [game(1)] });
+  await page.evaluate(() => {
+    const s = (window.__settings = { igdb: 'none' });
+    s.igdb_state = () => s.igdb;
+    s.igdb_paste_client_id = () => (s.igdb = 'id');
+    s.igdb_paste_secret = () => (s.igdb = 'ready');
+    s.igdb_remove = () => (s.igdb = 'none');
+    s.prefs_set_details_language = ({ language }) => ((window.__prefs.details_language = language), window.__prefs);
+    s.library_find_missing = () => null;
+  });
+  const row = (label) => page.locator('#settingsList .row').filter({ has: page.locator('.label', { hasText: label }) }).first();
+  const calls = () => page.evaluate(() => window.__calls.map((c) => JSON.stringify(c)));
+  await page.keyboard.press('c');
+  await row('System').click();
+  await idle(page);
+  check('without credentials, System offers to paste IGDB\'s Client ID', (await row('IGDB (details').textContent()).endsWith('Paste Client ID'));
+  await row('IGDB (details').click();
+  await idle(page);
+  check('the Client ID pasted, the next row asks for the Client Secret', (await calls()).includes('["igdb_paste_client_id",null]') && (await row('IGDB Client Secret').textContent()).endsWith('Paste from clipboard'));
+  await row('IGDB Client Secret').click();
+  await idle(page);
+  check('both pasted, IGDB is ready and can be removed', (await calls()).includes('["igdb_paste_secret",null]') && (await row('IGDB (details').textContent()).endsWith('Remove'));
+  await row('IGDB (details').click();
+  await idle(page);
+  check('removed, it asks for the Client ID again', (await calls()).includes('["igdb_remove",null]') && (await row('IGDB (details').textContent()).endsWith('Paste Client ID'));
+  // The language row is stepped with → from wherever focus is, as every adjustable row is.
+  const labels = await page.evaluate(() => [...document.querySelectorAll('#settingsList .row')].map((r) => r.querySelector('.label')?.firstChild?.textContent ?? ''));
+  const at = labels.findIndex((l) => l.startsWith('Language of game descriptions'));
+  const focused = await page.evaluate(() => [...document.querySelectorAll('#settingsList .row')].findIndex((r) => r.classList.contains('focus')));
+  for (let i = focused; i < at; i++) await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowRight');
+  await idle(page);
+  check('→ on the descriptions\' language picks the next one', (await calls()).includes('["prefs_set_details_language",{"language":"en"}]') && (await row('Language of game descriptions').textContent()).endsWith('English'));
+  await row('Find missing details and art').click();
+  await idle(page);
+  const s = await state(page);
+  check('Find missing details and art searches again and says so', (await calls()).includes('["library_find_missing",null]') && s.toast.includes('Searching for missing details and art'), s.toast);
+  await close(page);
+}
+
+// Lamplit's own language: Automatic follows Windows (English here); Español turns the page to Spanish at once, the
+// labels Rust and the page wrote both, and English brings back what was there.
+{
+  const page = await open({ games: [game(1)] });
+  await page.evaluate(() => {
+    window.__settings = { prefs_set_ui_language: ({ language }) => ((window.__prefs.ui_language = language), window.__prefs) };
+  });
+  const row = (label) => page.locator('#settingsList .row').filter({ has: page.locator('.label', { hasText: label }) }).first();
+  await page.keyboard.press('c');
+  await row('System').click();
+  await idle(page);
+  const labels = await page.evaluate(() => [...document.querySelectorAll('#settingsList .row')].map((r) => r.querySelector('.label')?.firstChild?.textContent ?? ''));
+  const at = labels.findIndex((l) => l === 'Lamplit language');
+  check('System offers Lamplit\'s language, Automatic at first', at >= 0 && (await row('Lamplit language').textContent()).endsWith('Automatic (this PC)'), JSON.stringify(labels));
+  for (let i = 0; i < at; i++) await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  await idle(page);
+  const sent = await page.evaluate(() => window.__calls.filter((c) => c[0] === 'prefs_set_ui_language').map((c) => c[1].language));
+  const spanish = await page.evaluate(() => ({
+    lang: document.documentElement.lang,
+    row: [...document.querySelectorAll('#settingsList .row .label')].map((l) => l.firstChild?.textContent).find((t) => t?.startsWith('Idioma de Lamplit')),
+    hint: document.getElementById('hint').textContent,
+  }));
+  check('→ steps to English, then Español, which turns the page to Spanish', JSON.stringify(sent) === '["en","es"]' && spanish.lang === 'es' && spanish.row === 'Idioma de Lamplit' && spanish.hint.includes('Atrás'), JSON.stringify({ sent, spanish }));
+  await page.keyboard.press('ArrowLeft');
+  await idle(page);
+  const english = await page.evaluate(() => ({ lang: document.documentElement.lang, hint: document.getElementById('hint').textContent }));
+  check('← back to English brings the English back', english.lang === 'en' && english.hint.includes('Back') && !english.hint.includes('Atrás'), JSON.stringify(english));
+  await close(page);
+}
+
+// A game's platform: ← and → on its menu's Platform row step it without asking Rust; closing the menu saves it, and
+// the home screen shows it beside the store.
+{
+  const games = [game(1)];
+  const page = await open({ games });
+  await page.evaluate((list) => {
+    window.__settings = {
+      library_set_platform: ({ id, platform }) => list.map((g) => (g.id === id ? { ...g, platform, platform_choice: platform } : g)),
+    };
+  }, games);
+  await page.keyboard.press('i');
+  for (let i = 0; i < 4; i++) await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  const label = await page.evaluate(() => document.querySelector('#dChoices .row.focus .label')?.firstChild?.textContent);
+  const early = await page.evaluate(() => window.__calls.some((c) => c[0] === 'library_set_platform'));
+  check('→ steps the platform in the menu, saving nothing yet', label === 'Platform: Nintendo Switch' && !early, `${label} ${early}`);
+  await page.keyboard.press('Escape');
+  await idle(page);
+  const saved = await page.evaluate(() => window.__calls.filter((c) => c[0] === 'library_set_platform'));
+  const pill = await page.evaluate(() => document.getElementById('platform').textContent);
+  check('closing the menu saves the platform once, and the home screen shows it', JSON.stringify(saved) === '[["library_set_platform",{"id":"pc:1","platform":"Nintendo Switch"}]]' && pill === 'Nintendo Switch', `${JSON.stringify(saved)} ${pill}`);
   await close(page);
 }
 
